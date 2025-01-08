@@ -1,0 +1,5 @@
+netron
+tabulate
+black
+isort
+torchmetrics
