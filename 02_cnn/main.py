@@ -10,6 +10,7 @@
 import os
 import copy
 import warnings
+import gc
 
 ## Other imports
 from tqdm import tqdm
@@ -59,25 +60,27 @@ DEVICE_CPU = "cpu"
 DEVICE_GPU = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 INP_SHAPE = 224
 RESIZE_SHAPE = 256
+N_VALIDATION_SAMPLES = 1024  # Set to None to use all samples
+N_CALIBRATION_SAMPLES = 256
 
 assert DATASETS is not None, "DATASETS environment variable not set"
 
 calib_loader = generate_dataloader(
     os.path.join(DATASETS, "ILSVRC2012/val"),
-    batch_size=64,
+    batch_size=32,
     num_workers=8,
     resize_shape=RESIZE_SHAPE,
     center_crop_shape=INP_SHAPE,
-    subset_size=256,
+    subset_size=N_CALIBRATION_SAMPLES,
 )
 
 val_loader = generate_dataloader(
     dir=os.path.join(DATASETS, "ILSVRC2012/val"),
-    batch_size=64,
+    batch_size=32,
     num_workers=8,
     resize_shape=RESIZE_SHAPE,
     center_crop_shape=INP_SHAPE,
-    subset_size=None,
+    subset_size=N_VALIDATION_SAMPLES,
 )
 
 ref_input = torch.ones(1, 3, INP_SHAPE, INP_SHAPE, device=DEVICE_CPU, dtype=DTYPE)
@@ -194,12 +197,17 @@ model_quant = quantize(
     quant_identity_map=QUANT_IDENTITY_MAP,
 )
 
+# Free GPU memory
+del model
+gc.collect()
+torch.cuda.empty_cache()
+
 print(model_quant)
 print(model_quant.graph.print_tabular())
 
 model_quant.eval()
 model_quant = model_quant.to(DEVICE_GPU)
-calibrate_model(model_quant, calib_loader, DEVICE_CPU)
+calibrate_model(model_quant, calib_loader, DEVICE_GPU)
 
 
 # %% Evaluate ResNet model using TorchMetrics

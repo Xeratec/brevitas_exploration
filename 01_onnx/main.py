@@ -6,11 +6,15 @@
 
 # %% Import and setup model
 
+### PyTorch Imports ###
+import torch
+
+### Brevitas Import ###
 from brevitas.quant.scaled_int import Int8ActPerTensorFloat, Int32Bias
-from brevitas.export import export_onnx_qcdq
+from brevitas.export import export_onnx_qcdq, export_qonnx
 import brevitas.nn as qnn
 
-import torch
+# %% Setup model
 
 IN_CH = 3
 IMG_SIZE = 128
@@ -42,7 +46,6 @@ inp = torch.randn(BATCH_SIZE, IN_CH, IMG_SIZE, IMG_SIZE)
 model = Model()
 model.eval()
 
+export_onnx_qcdq(model, args=inp, export_path="01_quant_model_qcdq.onnx", opset_version=13)
 
-export_onnx_qcdq(model, args=inp, export_path="01_quant_model_qcdq.onnx")
-
-# %%
+export_qonnx(model, args=inp, export_path="01_quant_model_qonnx.onnx", opset_version=13)

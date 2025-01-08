@@ -91,7 +91,7 @@ def validate(val_loader, model, stable=True):
             # measure accuracy
             (acc1,) = accuracy(output, target, stable=stable)
             top1.update(acc1[0], images.size(0))
-            pbar.set_postfix(acc1=top1.avg.cpu().numpy())
+            pbar.set_postfix(Acc1="{:.2f}%".format(top1.avg.cpu().numpy()))
 
         print_accuracy(top1, "Total:")
     return top1.avg.cpu().numpy()
