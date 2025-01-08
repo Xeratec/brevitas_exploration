@@ -80,8 +80,8 @@ def validate(val_loader, model, stable=True):
     model.eval()
     dtype = next(model.parameters()).dtype
     device = next(model.parameters()).device
-    with torch.no_grad():
-        for i, (images, target) in enumerate(tqdm(val_loader)):
+    with torch.no_grad(), tqdm(val_loader, desc="Evaluating") as pbar:
+        for i, (images, target) in enumerate(pbar):
             target = target.to(device)
             target = target.to(dtype)
             images = images.to(device)
@@ -91,6 +91,7 @@ def validate(val_loader, model, stable=True):
             # measure accuracy
             (acc1,) = accuracy(output, target, stable=stable)
             top1.update(acc1[0], images.size(0))
+            pbar.set_postfix(acc1=top1.avg.cpu().numpy())
 
         print_accuracy(top1, "Total:")
     return top1.avg.cpu().numpy()

@@ -55,8 +55,8 @@ import brevitas.nn as qnn
 # DATASETS = os.environ.get('DATASETS')
 DATASETS = "/usr/scratch/sassauna1/ml_datasets/"
 DTYPE = torch.float
-DEVICE = "cpu"
-# DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE_CPU = "cpu"
+DEVICE_GPU = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 INP_SHAPE = 224
 RESIZE_SHAPE = 256
 
@@ -68,7 +68,7 @@ calib_loader = generate_dataloader(
     num_workers=8,
     resize_shape=RESIZE_SHAPE,
     center_crop_shape=INP_SHAPE,
-    subset_size=100,
+    subset_size=256,
 )
 
 val_loader = generate_dataloader(
@@ -77,33 +77,18 @@ val_loader = generate_dataloader(
     num_workers=8,
     resize_shape=RESIZE_SHAPE,
     center_crop_shape=INP_SHAPE,
-    subset_size=100,
+    subset_size=None,
 )
 
-ref_input = torch.ones(1, 3, INP_SHAPE, INP_SHAPE, device=DEVICE, dtype=DTYPE)
+ref_input = torch.ones(1, 3, INP_SHAPE, INP_SHAPE, device=DEVICE_CPU, dtype=DTYPE)
+
 
 # %% Define useful helper functions
-from torchmetrics.classification import MulticlassAccuracy
-
-
-def evaluate_model_with_metrics(model, eval_loader, device):
-    model.eval()
-    model.to(device)
-    accuracy_metric = MulticlassAccuracy(num_classes=1000).to(device)  # Adjust num_classes as needed
-    with torch.no_grad(), quant_inference_mode(model):
-        for images, labels in tqdm(eval_loader, desc="Evaluating"):
-            images, labels = images.to(device), labels.to(device)
-            outputs = model(images)
-            predictions = outputs.argmax(dim=1)
-            accuracy_metric.update(predictions, labels)
-    return accuracy_metric.compute().item()
-
-
 def calibrate_model(model, calib_loader, device):
     model.eval()
     model.to(device)
-    with torch.no_grad(), calibration_mode(model):
-        for images, _ in tqdm(calib_loader, desc="Calibrating"):
+    with torch.no_grad(), calibration_mode(model), tqdm(calib_loader, desc="Calibrating") as pbar:
+        for images, _ in pbar:
             images = images.to(device)
             images = images.to(dtype)
             model(images)
@@ -111,8 +96,9 @@ def calibrate_model(model, calib_loader, device):
 
 # %% Get the model from torchvision
 model = torch.hub.load("pytorch/vision:v0.6.0", model="resnet18", weights="DEFAULT")
+
 model = model.to(DTYPE)
-model = model.to(DEVICE)
+model = model.to(DEVICE_CPU)
 
 dtype = next(model.parameters()).dtype
 device = next(model.parameters()).device
@@ -121,16 +107,16 @@ print(model)
 print("Device: ", device)
 print("Dtype: ", dtype)
 
-validate(val_loader, model)
 
-accuracy = evaluate_model_with_metrics(model, val_loader, device)
-print(f"Validation Accuracy: {accuracy:.2%}")
+model.eval()
+model = model.to(DEVICE_GPU)
+validate(val_loader, model)
 
 # %% Prepare for quantization
 from brevitas.graph.per_input import AdaptiveAvgPoolToAvgPool
 
 model.eval()
-model.to(device)
+model.to(DEVICE_CPU)
 model = preprocess_for_quantize(model, equalize_iters=20, equalize_scale_computation="range")
 
 # FN_TO_MODULE_MAP = ((torch.add, qnn.QuantEltwiseAdd), (operator.add, qnn.QuantEltwiseAdd), )
@@ -209,14 +195,14 @@ model_quant = quantize(
 print(model_quant)
 print(model_quant.graph.print_tabular())
 
-calibrate_model(model_quant, calib_loader, device)
+model_quant.eval()
+model_quant = model.to(DEVICE_GPU)
+calibrate_model(model_quant, calib_loader, DEVICE_CPU)
 
 # %% Evaluate ResNet model using TorchMetrics
+model_quant.eval()
+model_quant = model.to(DEVICE_GPU)
 validate(val_loader, model_quant)
-
-accuracy = evaluate_model_with_metrics(model_quant, val_loader, device)
-print(f"Validation Accuracy: {accuracy:.2%}")
-
 # %% Export model
 model_quant.eval()
 model_quant.to(device)
