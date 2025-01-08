@@ -11,6 +11,7 @@ help:
 	@echo " - 01_onnx: Run example one: Simple CNN without Training"
 	@echo " - 02_cnn: Run example two: ResNet18 on ImageNet-1k"
 	@echo " - format: Format the code"
+	@echo " - clean : Remove all generated files"
 	@echo " - help: Show this help message"
 
 01_onnx:
@@ -27,6 +28,8 @@ format:
 	@echo "Formatting code"
 	@black */*.py
 
+clean:
+	@echo "Cleaning up..."
+	@rm -rf *.onnx *.pth *.log *.pt *_log.txt
 
-
-.PHONY: format all 01_onnx 02_cnn help
+.PHONY: format all 01_onnx 02_cnn help clean

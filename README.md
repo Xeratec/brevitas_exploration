@@ -9,7 +9,7 @@ First, setup a new mamba/conda environment and install the required packages:
 mamba create -n brevitas
 mamba activate brevitas
 mamba install python=3.11
-mamba install pytorch==2.1.1 torchvision==0.16.1 torchaudio==2.1.1 pytorch-cuda=12.1 -c pytorch -c nvidia
+conda install pytorch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 pytorch-cuda=12.1 -c pytorch -c nvidia
 ```
 
 I suggest to install some additional useful packages:
