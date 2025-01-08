@@ -112,6 +112,7 @@ model.eval()
 model = model.to(DEVICE_GPU)
 validate(val_loader, model)
 
+
 # %% Prepare for quantization
 from brevitas.graph.per_input import AdaptiveAvgPoolToAvgPool
 
@@ -126,6 +127,7 @@ model = AdaptiveAvgPoolToAvgPool().apply(model, ref_input)
 
 print(model)
 print(model.graph.print_tabular())
+
 
 # %% Quantize model activation
 from brevitas.quant import Int8ActPerTensorFloat
@@ -196,22 +198,25 @@ print(model_quant)
 print(model_quant.graph.print_tabular())
 
 model_quant.eval()
-model_quant = model.to(DEVICE_GPU)
+model_quant = model_quant.to(DEVICE_GPU)
 calibrate_model(model_quant, calib_loader, DEVICE_CPU)
+
 
 # %% Evaluate ResNet model using TorchMetrics
 model_quant.eval()
-model_quant = model.to(DEVICE_GPU)
+model_quant = model_quant.to(DEVICE_GPU)
 validate(val_loader, model_quant)
+
+
 # %% Export model
 model_quant.eval()
 model_quant.to(device)
+
 
 # %% Export QCDQ model
 export_onnx_qcdq(model_quant, args=ref_input, export_path="02_quant_model_qcdq.onnx", opset_version=13)
 export_torch_qcdq(model_quant, args=ref_input, export_path="02_quant_model_qcdq.pt")
 
+
 # %% Export QONNX model
 export_qonnx(model_quant, args=ref_input, export_path="02_quant_model_qonnx.onnx", opset_version=13)
-
-# %%
