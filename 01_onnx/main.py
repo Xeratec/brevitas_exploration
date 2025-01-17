@@ -5,21 +5,33 @@
 # Philip Wiese <wiesep@iis.ee.ethz.ch>
 
 # %% Import and setup model
+from pathlib import Path
 
 ### PyTorch Imports ###
 import torch
 
 ### Brevitas Import ###
+import brevitas.nn as qnn
 from brevitas.quant.scaled_int import Int8ActPerTensorFloat, Int32Bias
 from brevitas.export import export_onnx_qcdq, export_qonnx
-import brevitas.nn as qnn
+from brevitas.export.inference import quant_inference_mode
+from brevitas.export.onnx.manager import ONNXBaseManager
 
 # %% Setup model
+
+EXPORT_FOLDER = Path().cwd()
+# JUNGVI: Make sure we can run this script from anywhere and the exported ONNX still end up in the right folder
+if Path().cwd().name != "01_onnx":
+    EXPORT_FOLDER = EXPORT_FOLDER / "01_onnx"
+
+DTYPE = torch.float
 
 IN_CH = 3
 IMG_SIZE = 128
 OUT_CH = 128
 BATCH_SIZE = 1
+
+ref_input = torch.ones(1, IN_CH, IMG_SIZE, IMG_SIZE, dtype=DTYPE)
 
 
 class Model(torch.nn.Module):
@@ -46,6 +58,14 @@ inp = torch.randn(BATCH_SIZE, IN_CH, IMG_SIZE, IMG_SIZE)
 model = Model()
 model.eval()
 
-export_onnx_qcdq(model, args=inp, export_path="01_quant_model_qcdq.onnx", opset_version=13)
+# JUNGVI: Showcase the different exports from brevitas.
+# Inference mode exports a static quantization version of the graph with atomic ONNX nodes.
+with torch.no_grad(), quant_inference_mode(model):
+    model(inp)
+    ONNXBaseManager.export(
+        model, args=inp, export_path=EXPORT_FOLDER / "01_quant_model_base_inf.onnx", opset_version=13
+    )
 
-export_qonnx(model, args=inp, export_path="01_quant_model_qonnx.onnx", opset_version=13)
+ONNXBaseManager.export(model, args=inp, export_path=EXPORT_FOLDER / "01_quant_model_base.onnx", opset_version=13)
+export_onnx_qcdq(model, args=inp, export_path=EXPORT_FOLDER / "01_quant_model_qcdq.onnx", opset_version=13)
+export_qonnx(model, args=inp, export_path=EXPORT_FOLDER / "01_quant_model_qonnx.onnx", opset_version=13)
