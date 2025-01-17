@@ -1,7 +1,7 @@
 # Copyright 2025 ETH Zurich.
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
-# 
+#
 # Victor Jung <jungvi@iis.ee.ethz.ch>
 
 # JUNGVI: The idea here is to have replacements for the forward function of the quantizer layer modules from Brevitas
@@ -26,9 +26,11 @@ def quantWBIOL_forward(self, inp):
     quant_output = self.output_quant(output)
     return quant_output
 
-def quantWBIOL_injector(module: QuantWeightBiasInputOutputLayer):
 
-    assert isinstance(module, QuantWeightBiasInputOutputLayer), f"{type(module)} is not an instance of QuantWeightBiasInputOutputLayer!"
+def quantWBIOL_injector(module: QuantWeightBiasInputOutputLayer):
+    assert isinstance(
+        module, QuantWeightBiasInputOutputLayer
+    ), f"{type(module)} is not an instance of QuantWeightBiasInputOutputLayer!"
 
     module.wrapped_inner_forward_impl = InnerForwardImplWrapperWBIOL(module.inner_forward_impl)
     module.forward = quantWBIOL_forward.__get__(module)

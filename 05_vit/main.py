@@ -5,6 +5,7 @@ from torchvision.models import vit_b_16
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+
 def validate_model(model, dataloader, device, max_samples=None):
     """Validate the model on the dataset."""
     model.eval()
@@ -37,6 +38,7 @@ def validate_model(model, dataloader, device, max_samples=None):
 
     return accuracy
 
+
 if __name__ == "__main__":
     # Path to the ImageNet dataset
     imagenet_path = "/usr/scratch/sassauna1/ml_datasets/ILSVRC2012/"
@@ -45,12 +47,14 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Define the transformations for the dataset
-    transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
+    transform = transforms.Compose(
+        [
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
 
     # Hyperparameter: Maximum samples to validate
     max_samples = 1000  # Set to None for full validation
@@ -60,12 +64,10 @@ if __name__ == "__main__":
     val_dataset = datasets.ImageFolder(root=f"{imagenet_path}/val", transform=transform)
     val_dataset = torch.utils.data.Subset(val_dataset, list(range(subset_size)))
     val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False, num_workers=4, pin_memory=True)
-    
 
     # Load a pre-trained small Vision Transformer (ViT)
     model = vit_b_16(weights="IMAGENET1K_V1")  # Using a pre-trained small ViT
     model = model.to(device)
-
 
     # Validate the model
     # print("Validating the model on ImageNet...")
@@ -77,9 +79,8 @@ if __name__ == "__main__":
     from brevitas.graph.quantize import quantize
     from brevitas.fx import brevitas_symbolic_trace
 
-    model.to('cpu')
+    model.to("cpu")
     fx_model = brevitas_symbolic_trace(model)
-    
 
     # model = preprocess_for_quantize(model, equalize_iters=20, equalize_scale_computation="range")
 
@@ -95,7 +96,6 @@ if __name__ == "__main__":
     # from brevitas.quant import Int8WeightPerTensorFloat
     # from brevitas.quant import Int32Bias
     # from brevitas.quant import Uint8ActPerTensorFloat
-
 
     # # from brevitas.quant import Uint8ActPerTensorFloatMaxInit
 
@@ -174,4 +174,6 @@ if __name__ == "__main__":
     # accuracy = validate_model(model_quant, val_loader, "cuda", max_samples=max_samples)
     # print(f"Validation Accuracy: {accuracy:.2f}%")
 
-    import IPython; IPython.embed()
+    import IPython
+
+    IPython.embed()
