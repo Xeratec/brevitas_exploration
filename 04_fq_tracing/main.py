@@ -6,11 +6,9 @@
 
 
 # %% Import and setup model
-import copy
 from pathlib import Path
 
 ### PyTorch Imports ###
-import brevitas
 import torch
 
 ### Brevitas Import ###
@@ -18,8 +16,8 @@ from brevitas.fx import brevitas_symbolic_trace
 from brevitas.nn.quant_layer import QuantWeightBiasInputOutputLayer
 
 ### Local Imports ###
-from tracer import custom_brevitas_symbolic_trace
-from tracer import InnerForwardImplWrapper
+from BrevitasExporter.tracer import custom_brevitas_symbolic_trace
+from BrevitasExporter.moduleWrapper import InnerForwardImplWrapperWBIOL
 from models import ModelQuantConv2d, ModelQuantLinear
 
 
@@ -65,7 +63,7 @@ for node in traced_quant_conv.graph.nodes:
     if node.op == "call_module":
         target_module = getattr(traced_quant_conv, node.target)
         if isinstance(target_module, QuantWeightBiasInputOutputLayer):
-            target_module.wrapped_inner_forward_impl = InnerForwardImplWrapper(target_module.inner_forward_impl)
+            target_module.wrapped_inner_forward_impl = InnerForwardImplWrapperWBIOL(target_module.inner_forward_impl)
             target_module.forward = quantWBIOL_forward.__get__(target_module)
 export_ready_quant_conv = custom_brevitas_symbolic_trace(quant_conv)
 
@@ -74,7 +72,7 @@ for node in traced_quant_linear.graph.nodes:
     if node.op == "call_module":
         target_module = getattr(traced_quant_linear, node.target)
         if isinstance(target_module, QuantWeightBiasInputOutputLayer):
-            target_module.wrapped_inner_forward_impl = InnerForwardImplWrapper(target_module.inner_forward_impl)
+            target_module.wrapped_inner_forward_impl = InnerForwardImplWrapperWBIOL(target_module.inner_forward_impl)
             target_module.forward = quantWBIOL_forward.__get__(target_module)
 export_ready_quant_linear = custom_brevitas_symbolic_trace(quant_linear)
 

@@ -9,7 +9,7 @@
 import torch
 
 
-class InnerForwardImplWrapper(torch.nn.Module):
+class InnerForwardImplWrapperWBIOL(torch.nn.Module):
     def __init__(self, inner_forward_impl):
         super().__init__()
         self.inner_forward_impl = inner_forward_impl

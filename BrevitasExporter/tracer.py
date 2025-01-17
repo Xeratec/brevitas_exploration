@@ -12,14 +12,14 @@ from brevitas.fx import Tracer
 from brevitas.fx.brevitas_tracer import _is_brevitas_leaf_module, _symbolic_trace
 
 ### Local Imports ###
-from moduleWrapper import InnerForwardImplWrapper
+from moduleWrapper import InnerForwardImplWrapperWBIOL
 
 
 class CustomBrevitasSymbolicTracer(Tracer):
     def is_leaf_module(self, m: Module, module_qualified_name: str) -> bool:
         if m.__module__.startswith("brevitas.nn.quant_conv") or m.__module__.startswith("brevitas.nn.quant_linear"):
             return False
-        if isinstance(m, InnerForwardImplWrapper):
+        if isinstance(m, InnerForwardImplWrapperWBIOL):
             return True
         return _is_brevitas_leaf_module(m, module_qualified_name)
 
