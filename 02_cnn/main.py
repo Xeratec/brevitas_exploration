@@ -11,6 +11,7 @@ import os
 import copy
 import warnings
 import gc
+from pathlib import Path
 
 ## Other imports
 from tqdm import tqdm
@@ -44,7 +45,6 @@ warnings.filterwarnings(
 from brevitas.graph.quantize import preprocess_for_quantize
 from brevitas.graph.quantize import quantize
 from brevitas.graph.calibrate import calibration_mode
-from brevitas.export.inference import quant_inference_mode
 from brevitas.export import export_onnx_qcdq
 from brevitas.export import export_torch_qcdq
 from brevitas.export import export_qonnx
@@ -53,7 +53,11 @@ import brevitas.nn as qnn
 
 # %% Setup configuration and data loaders
 
-# DATASETS = os.environ.get('DATASETS')
+EXPORT_FOLDER = Path().cwd()
+# JUNGVI: Make sure we can run this script from anywhere and the exported ONNX still end up in the right folder
+if Path().cwd().name != "02_cnn":
+    EXPORT_FOLDER = EXPORT_FOLDER / "02_cnn"
+
 DATASETS = "/usr/scratch/sassauna1/ml_datasets/"
 DTYPE = torch.float
 DEVICE_CPU = "cpu"
@@ -222,9 +226,8 @@ model_quant.to(device)
 
 
 # %% Export QCDQ model
-export_onnx_qcdq(model_quant, args=ref_input, export_path="02_quant_model_qcdq.onnx", opset_version=13)
-export_torch_qcdq(model_quant, args=ref_input, export_path="02_quant_model_qcdq.pt")
-
+export_onnx_qcdq(model_quant, args=ref_input, export_path=EXPORT_FOLDER / "02_quant_model_qcdq.onnx", opset_version=13)
+export_torch_qcdq(model_quant, args=ref_input, export_path=EXPORT_FOLDER / "02_quant_model_qcdq.pt")
 
 # %% Export QONNX model
-export_qonnx(model_quant, args=ref_input, export_path="02_quant_model_qonnx.onnx", opset_version=13)
+export_qonnx(model_quant, args=ref_input, export_path=EXPORT_FOLDER / "02_quant_model_qonnx.onnx", opset_version=13)
