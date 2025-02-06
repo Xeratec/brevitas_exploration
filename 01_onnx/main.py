@@ -58,7 +58,7 @@ inp = torch.randn(BATCH_SIZE, IN_CH, IMG_SIZE, IMG_SIZE)
 model = Model()
 model.eval()
 
-ONNXBaseManager.target_name = 'StdONNX'
+ONNXBaseManager.target_name = "StdONNX"
 
 # JUNGVI: Showcase the different exports from brevitas.
 # Inference mode exports a static quantization version of the graph with atomic ONNX nodes.
