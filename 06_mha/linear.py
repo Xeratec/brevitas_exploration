@@ -1,3 +1,9 @@
+# Copyright 2025 ETH Zurich and University of Bologna.
+# Licensed under the Apache License, Version 2.0, see LICENSE for details.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Federico Brancasi <fbrancasi@ethz.ch>
+
 import warnings
 from typing import Optional
 import torch
@@ -13,15 +19,11 @@ warnings.filterwarnings("ignore", message="Named tensors.*")
 warnings.filterwarnings("ignore", message="Defining your.*__torch_function__.*")
 
 # -----------------------------------------------------------------------------
-# Brevitas imports 
+# Brevitas imports
 # -----------------------------------------------------------------------------
 import brevitas.nn as qnn
 from brevitas.fx import brevitas_symbolic_trace
-from brevitas.fx.brevitas_tracer import (
-    _symbolic_trace,
-    _is_brevitas_leaf_module,
-    Tracer
-)
+from brevitas.fx.brevitas_tracer import _symbolic_trace, _is_brevitas_leaf_module, Tracer
 from brevitas.nn.quant_layer import QuantWeightBiasInputOutputLayer
 from brevitas.quant.scaled_int import Int8ActPerTensorFloat, Int32Bias
 from brevitas.quant_tensor import QuantTensor
@@ -30,12 +32,14 @@ from brevitas.quant_tensor import QuantTensor
 # 1) Model with a single Brevitas QuantLinear
 # -----------------------------------------------------------------------------
 
+
 class ModelQuantLinear(nn.Module):
     """
     A simple example model that uses a Brevitas QuantLinear, which by default
     hides internal quantization (input_quant, weight_quant, bias_quant, output_quant)
     inside a single call_module. We want to "unroll" these for export.
     """
+
     def __init__(self, in_features: int, out_features: int):
         super().__init__()
         self.input_quant = qnn.QuantIdentity(return_quant_tensor=True)
@@ -54,14 +58,17 @@ class ModelQuantLinear(nn.Module):
         out = self.linear(inp)
         return out
 
+
 # -----------------------------------------------------------------------------
 # 2) Unrolled Forward for QuantLinear + Injection
 # -----------------------------------------------------------------------------
+
 
 class InnerForwardImplWrapperLinear(nn.Module):
     """
     A small wrapper around the existing Brevitas 'inner_forward_impl' of a QuantLinear.
     """
+
     def __init__(self, inner_forward_impl):
         super().__init__()
         self.inner_forward_impl = inner_forward_impl
@@ -106,9 +113,11 @@ def quantWBIOL_injector(module: QuantWeightBiasInputOutputLayer) -> None:
     # Override forward
     module.forward = quantWBIOL_forward.__get__(module)
 
+
 # -----------------------------------------------------------------------------
 # 3) Custom FX Tracer to expand brevitas.nn.quant_linear
 # -----------------------------------------------------------------------------
+
 
 class CustomBrevitasSymbolicTracer(Tracer):
     """
@@ -116,6 +125,7 @@ class CustomBrevitasSymbolicTracer(Tracer):
     (so we can see all quantization calls). We do treat the small wrapper
     module as leaf to keep it a single call_module.
     """
+
     def is_leaf_module(self, m: nn.Module, module_qualified_name: str) -> bool:
         # If this is a module from 'brevitas.nn.quant_linear', expand it
         if m.__module__.startswith("brevitas.nn.quant_linear"):
@@ -126,24 +136,23 @@ class CustomBrevitasSymbolicTracer(Tracer):
         return _is_brevitas_leaf_module(m, module_qualified_name)
 
 
-def custom_brevitas_symbolic_trace(
-    root: nn.Module,
-    concrete_args=None
-) -> GraphModule:
+def custom_brevitas_symbolic_trace(root: nn.Module, concrete_args=None) -> GraphModule:
     """
     Shortcut function to call the low-level _symbolic_trace with our custom tracer.
     """
     return _symbolic_trace(CustomBrevitasSymbolicTracer(), root, concrete_args)
 
+
 # -----------------------------------------------------------------------------
 # 4) Transformation: Unroll QuantLinear
 # -----------------------------------------------------------------------------
+
 
 def transform_brevitas_quant_linear_model(model: nn.Module) -> GraphModule:
     """
     1. Trace the model with the default Brevitas tracer (brevitas_symbolic_trace).
     2. Inject the unrolled forward logic into each QuantLinear found.
-    3. Re-trace with our custom tracer (custom_brevitas_symbolic_trace) 
+    3. Re-trace with our custom tracer (custom_brevitas_symbolic_trace)
        so the final FX graph explicitly shows each quantization step.
     """
     # Step 1: default Brevitas trace
@@ -165,6 +174,7 @@ def transform_brevitas_quant_linear_model(model: nn.Module) -> GraphModule:
 # -----------------------------------------------------------------------------
 # 5) Main test
 # -----------------------------------------------------------------------------
+
 
 def main():
     # Set a manual seed for reproducibility
@@ -196,9 +206,8 @@ def main():
     if out_default.value.equal(out_unrolled.value):
         print("\n✓ Test passed! Outputs match.")
     else:
-        raise RuntimeError(
-            "Unrolled QuantLinear model does not produce the same output as default!"
-        )
+        raise RuntimeError("Unrolled QuantLinear model does not produce the same output as default!")
+
 
 if __name__ == "__main__":
     main()
