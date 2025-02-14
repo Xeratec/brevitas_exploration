@@ -25,10 +25,19 @@ import torch.nn as nn
 
 ## Disable some annoying warnings
 warnings.filterwarnings("ignore", category=UserWarning, message=".*deprecated.*")
-warnings.filterwarnings("ignore", category=UserWarning, module="torch", message=".*experimental feature.*")
-warnings.filterwarnings("ignore", category=UserWarning, module="torchvision", message=".*experimental feature.*")
 warnings.filterwarnings(
-    "ignore", category=torch.jit.TracerWarning, message=".*results are registered as constants in the trace.*"
+    "ignore", category=UserWarning, module="torch", message=".*experimental feature.*"
+)
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    module="torchvision",
+    message=".*experimental feature.*",
+)
+warnings.filterwarnings(
+    "ignore",
+    category=torch.jit.TracerWarning,
+    message=".*results are registered as constants in the trace.*",
 )
 warnings.filterwarnings(
     "ignore",
@@ -94,7 +103,9 @@ ref_input = torch.ones(1, 3, INP_SHAPE, INP_SHAPE, device=DEVICE_CPU, dtype=DTYP
 def calibrate_model(model, calib_loader, device):
     model.eval()
     model.to(device)
-    with torch.no_grad(), calibration_mode(model), tqdm(calib_loader, desc="Calibrating") as pbar:
+    with torch.no_grad(), calibration_mode(model), tqdm(
+        calib_loader, desc="Calibrating"
+    ) as pbar:
         for images, _ in pbar:
             images = images.to(device)
             images = images.to(dtype)
@@ -125,7 +136,9 @@ from brevitas.graph.per_input import AdaptiveAvgPoolToAvgPool
 
 model.eval()
 model.to(DEVICE_CPU)
-model = preprocess_for_quantize(model, equalize_iters=20, equalize_scale_computation="range")
+model = preprocess_for_quantize(
+    model, equalize_iters=20, equalize_scale_computation="range"
+)
 
 # FN_TO_MODULE_MAP = ((torch.add, qnn.QuantEltwiseAdd), (operator.add, qnn.QuantEltwiseAdd), )
 # model = TorchFunctionalToModule(fn_to_module_map=FN_TO_MODULE_MAP).apply(model)
@@ -190,8 +203,22 @@ QUANT_ACT_MAP = {
 }
 
 QUANT_IDENTITY_MAP = {
-    "signed": (qnn.QuantIdentity, {"act_quant": Int8ActPerTensorFloat, "return_quant_tensor": True, "bit_width": 7}),
-    "unsigned": (qnn.QuantIdentity, {"act_quant": Uint8ActPerTensorFloat, "return_quant_tensor": True, "bit_width": 7}),
+    "signed": (
+        qnn.QuantIdentity,
+        {
+            "act_quant": Int8ActPerTensorFloat,
+            "return_quant_tensor": True,
+            "bit_width": 7,
+        },
+    ),
+    "unsigned": (
+        qnn.QuantIdentity,
+        {
+            "act_quant": Uint8ActPerTensorFloat,
+            "return_quant_tensor": True,
+            "bit_width": 7,
+        },
+    ),
 }
 
 model_quant = quantize(
@@ -226,8 +253,20 @@ model_quant.to(device)
 
 
 # %% Export QCDQ model
-export_onnx_qcdq(model_quant, args=ref_input, export_path=EXPORT_FOLDER / "02_quant_model_qcdq.onnx", opset_version=13)
-export_torch_qcdq(model_quant, args=ref_input, export_path=EXPORT_FOLDER / "02_quant_model_qcdq.pt")
+export_onnx_qcdq(
+    model_quant,
+    args=ref_input,
+    export_path=EXPORT_FOLDER / "02_quant_model_qcdq.onnx",
+    opset_version=13,
+)
+export_torch_qcdq(
+    model_quant, args=ref_input, export_path=EXPORT_FOLDER / "02_quant_model_qcdq.pt"
+)
 
 # %% Export QONNX model
-export_qonnx(model_quant, args=ref_input, export_path=EXPORT_FOLDER / "02_quant_model_qonnx.onnx", opset_version=13)
+export_qonnx(
+    model_quant,
+    args=ref_input,
+    export_path=EXPORT_FOLDER / "02_quant_model_qonnx.onnx",
+    opset_version=13,
+)

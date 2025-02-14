@@ -23,7 +23,11 @@ from typing import Optional, Tuple
 # ----------------------------------------------------------------------------
 import brevitas.nn as qnn
 from brevitas.fx import brevitas_symbolic_trace
-from brevitas.fx.brevitas_tracer import _symbolic_trace, _is_brevitas_leaf_module, Tracer
+from brevitas.fx.brevitas_tracer import (
+    _symbolic_trace,
+    _is_brevitas_leaf_module,
+    Tracer,
+)
 from brevitas.nn.quant_mha import QuantMultiheadAttention
 from brevitas.nn.quant_layer import QuantWeightBiasInputOutputLayer
 
@@ -33,7 +37,9 @@ from brevitas.nn.quant_layer import QuantWeightBiasInputOutputLayer
 # ----------------------------------------------------------------------------
 
 
-def unrolled_quant_mha_forward(self: QuantMultiheadAttention, query: Tensor, key: Tensor, value: Tensor) -> Tensor:
+def unrolled_quant_mha_forward(
+    self: QuantMultiheadAttention, query: Tensor, key: Tensor, value: Tensor
+) -> Tensor:
     """
     Export-friendly forward that explicitly unrolls the multihead logic:
       - Q/K/V projections
@@ -51,9 +57,21 @@ def unrolled_quant_mha_forward(self: QuantMultiheadAttention, query: Tensor, key
     L, N, E = q_out.shape  # (sequence_len, batch_size, embed_dim)
     head_dim = E // self.num_heads
 
-    q_out = q_out.view(L, N, self.num_heads, head_dim).permute(1, 2, 0, 3).reshape(N * self.num_heads, L, head_dim)
-    k_out = k_out.view(L, N, self.num_heads, head_dim).permute(1, 2, 0, 3).reshape(N * self.num_heads, L, head_dim)
-    v_out = v_out.view(L, N, self.num_heads, head_dim).permute(1, 2, 0, 3).reshape(N * self.num_heads, L, head_dim)
+    q_out = (
+        q_out.view(L, N, self.num_heads, head_dim)
+        .permute(1, 2, 0, 3)
+        .reshape(N * self.num_heads, L, head_dim)
+    )
+    k_out = (
+        k_out.view(L, N, self.num_heads, head_dim)
+        .permute(1, 2, 0, 3)
+        .reshape(N * self.num_heads, L, head_dim)
+    )
+    v_out = (
+        v_out.view(L, N, self.num_heads, head_dim)
+        .permute(1, 2, 0, 3)
+        .reshape(N * self.num_heads, L, head_dim)
+    )
 
     # 3) Scale Q, then quantize
     q_scaled = q_out / math.sqrt(head_dim)
@@ -74,7 +92,11 @@ def unrolled_quant_mha_forward(self: QuantMultiheadAttention, query: Tensor, key
     attn_output = torch.bmm(attn_weights, v_out)
 
     # 7) Reshape back to (L, N, E)
-    attn_output = attn_output.view(N, self.num_heads, L, head_dim).permute(2, 0, 1, 3).reshape(L, N, E)
+    attn_output = (
+        attn_output.view(N, self.num_heads, L, head_dim)
+        .permute(2, 0, 1, 3)
+        .reshape(L, N, E)
+    )
 
     # 8) Out projection
     attn_output = self.out_proj(attn_output)
@@ -111,7 +133,9 @@ class InnerForwardWrapperLinear(nn.Module):
         return self.inner_forward_impl(quant_input, quant_weight, quant_bias)
 
 
-def unrolled_quant_linear_forward(self: QuantWeightBiasInputOutputLayer, inp: Tensor) -> Tensor:
+def unrolled_quant_linear_forward(
+    self: QuantWeightBiasInputOutputLayer, inp: Tensor
+) -> Tensor:
     """
     Unrolled forward for a Brevitas QuantLinear:
       - input_quant
@@ -137,7 +161,9 @@ def inject_unrolled_quant_linear(module: QuantWeightBiasInputOutputLayer) -> Non
         return
 
     # Wrap original inner_forward_impl
-    module.wrapped_inner_forward_impl = InnerForwardWrapperLinear(module.inner_forward_impl)
+    module.wrapped_inner_forward_impl = InnerForwardWrapperLinear(
+        module.inner_forward_impl
+    )
     # Override forward
     module.forward = unrolled_quant_linear_forward.__get__(module)
 

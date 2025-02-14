@@ -23,7 +23,11 @@ warnings.filterwarnings("ignore", message="Defining your.*__torch_function__.*")
 # -----------------------------------------------------------------------------
 import brevitas.nn as qnn
 from brevitas.fx import brevitas_symbolic_trace
-from brevitas.fx.brevitas_tracer import _symbolic_trace, _is_brevitas_leaf_module, Tracer
+from brevitas.fx.brevitas_tracer import (
+    _symbolic_trace,
+    _is_brevitas_leaf_module,
+    Tracer,
+)
 from brevitas.nn.quant_layer import QuantWeightBiasInputOutputLayer
 from brevitas.quant.scaled_int import Int8ActPerTensorFloat, Int32Bias
 from brevitas.quant_tensor import QuantTensor
@@ -106,10 +110,14 @@ def quantWBIOL_injector(module: QuantWeightBiasInputOutputLayer) -> None:
     with an unrolled version that exposes the internal quantization steps.
     """
     if not isinstance(module, QuantWeightBiasInputOutputLayer):
-        raise TypeError(f"Expected a QuantWeightBiasInputOutputLayer, got {type(module)}.")
+        raise TypeError(
+            f"Expected a QuantWeightBiasInputOutputLayer, got {type(module)}."
+        )
 
     # Wrap the original inner_forward_impl
-    module.wrapped_inner_forward_impl = InnerForwardImplWrapperLinear(module.inner_forward_impl)
+    module.wrapped_inner_forward_impl = InnerForwardImplWrapperLinear(
+        module.inner_forward_impl
+    )
     # Override forward
     module.forward = quantWBIOL_forward.__get__(module)
 
@@ -206,7 +214,9 @@ def main():
     if out_default.value.equal(out_unrolled.value):
         print("\n✓ Test passed! Outputs match.")
     else:
-        raise RuntimeError("Unrolled QuantLinear model does not produce the same output as default!")
+        raise RuntimeError(
+            "Unrolled QuantLinear model does not produce the same output as default!"
+        )
 
 
 if __name__ == "__main__":

@@ -2,10 +2,8 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Philip Wiese <wiesep@iis.ee.ethz.ch>
+# Federico Brancasi <fbrancasi@ethz.ch>
 
-[tool.black]
-line-length = 120
-target-version = ['py38']
-include = '\\.pyi?$'
-exclude = ''
+"""
+Subpackage containing custom forward implementations.
+"""

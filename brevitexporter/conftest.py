@@ -1,0 +1,38 @@
+# Copyright 2025 ETH Zurich and
+# University of Bologna. Licensed under the Apache License,
+# Version 2.0, see LICENSE for details.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Federico Brancasi <fbrancasi@ethz.ch>
+
+import warnings
+import pytest
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """
+    Configure pytest to ignore specific warnings.
+
+    Args:
+        config: The pytest Config object, not used in detail here.
+    """
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    warnings.filterwarnings("ignore", category=UserWarning, message="Named tensors.*")
+    warnings.filterwarnings(
+        "ignore", category=UserWarning, message=".*__torch_function__.*"
+    )
+    warnings.filterwarnings(
+        "ignore", category=UserWarning, message="Was not able to add assertion.*"
+    )
+    warnings.filterwarnings(
+        "ignore", category=UserWarning, message="'has_cuda' is deprecated.*"
+    )
+    warnings.filterwarnings(
+        "ignore", category=UserWarning, message="'has_cudnn' is deprecated.*"
+    )
+    warnings.filterwarnings(
+        "ignore", category=UserWarning, message="'has_mps' is deprecated.*"
+    )
+    warnings.filterwarnings(
+        "ignore", category=UserWarning, message="'has_mkldnn' is deprecated.*"
+    )

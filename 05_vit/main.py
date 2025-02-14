@@ -69,7 +69,9 @@ if __name__ == "__main__":
     # Load the ImageNet validation dataset
     val_dataset = datasets.ImageFolder(root=f"{imagenet_path}/val", transform=transform)
     val_dataset = torch.utils.data.Subset(val_dataset, list(range(subset_size)))
-    val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False, num_workers=4, pin_memory=True)
+    val_loader = DataLoader(
+        val_dataset, batch_size=64, shuffle=False, num_workers=4, pin_memory=True
+    )
 
     # Load a pre-trained small Vision Transformer (ViT)
     model = vit_b_16(weights="IMAGENET1K_V1")  # Using a pre-trained small ViT

@@ -65,9 +65,27 @@ ONNXBaseManager.target_name = "StdONNX"
 with torch.no_grad(), quant_inference_mode(model):
     model(inp)
     ONNXBaseManager.export(
-        model, args=inp, export_path=EXPORT_FOLDER / "01_quant_model_base_inf.onnx", opset_version=13
+        model,
+        args=inp,
+        export_path=EXPORT_FOLDER / "01_quant_model_base_inf.onnx",
+        opset_version=13,
     )
 
-ONNXBaseManager.export(model, args=inp, export_path=EXPORT_FOLDER / "01_quant_model_base.onnx", opset_version=13)
-export_onnx_qcdq(model, args=inp, export_path=EXPORT_FOLDER / "01_quant_model_qcdq.onnx", opset_version=13)
-export_qonnx(model, args=inp, export_path=EXPORT_FOLDER / "01_quant_model_qonnx.onnx", opset_version=13)
+ONNXBaseManager.export(
+    model,
+    args=inp,
+    export_path=EXPORT_FOLDER / "01_quant_model_base.onnx",
+    opset_version=13,
+)
+export_onnx_qcdq(
+    model,
+    args=inp,
+    export_path=EXPORT_FOLDER / "01_quant_model_qcdq.onnx",
+    opset_version=13,
+)
+export_qonnx(
+    model,
+    args=inp,
+    export_path=EXPORT_FOLDER / "01_quant_model_qonnx.onnx",
+    opset_version=13,
+)

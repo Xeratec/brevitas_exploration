@@ -63,7 +63,9 @@ for node in traced_quant_conv.graph.nodes:
     if node.op == "call_module":
         target_module = getattr(traced_quant_conv, node.target)
         if isinstance(target_module, QuantWeightBiasInputOutputLayer):
-            target_module.wrapped_inner_forward_impl = InnerForwardImplWrapperWBIOL(target_module.inner_forward_impl)
+            target_module.wrapped_inner_forward_impl = InnerForwardImplWrapperWBIOL(
+                target_module.inner_forward_impl
+            )
             target_module.forward = quantWBIOL_forward.__get__(target_module)
 export_ready_quant_conv = custom_brevitas_symbolic_trace(quant_conv)
 
@@ -72,7 +74,9 @@ for node in traced_quant_linear.graph.nodes:
     if node.op == "call_module":
         target_module = getattr(traced_quant_linear, node.target)
         if isinstance(target_module, QuantWeightBiasInputOutputLayer):
-            target_module.wrapped_inner_forward_impl = InnerForwardImplWrapperWBIOL(target_module.inner_forward_impl)
+            target_module.wrapped_inner_forward_impl = InnerForwardImplWrapperWBIOL(
+                target_module.inner_forward_impl
+            )
             target_module.forward = quantWBIOL_forward.__get__(target_module)
 export_ready_quant_linear = custom_brevitas_symbolic_trace(quant_linear)
 
@@ -80,8 +84,14 @@ export_ready_quant_linear = custom_brevitas_symbolic_trace(quant_linear)
 # JUNGVI: Look at the new graphs and test that they are still functionally equivalent to the original graph
 print(traced_quant_conv.graph)
 print(export_ready_quant_conv.graph)
-assert traced_quant_conv(ref_input_conv).value.all() == export_ready_quant_conv(ref_input_conv).value.all()
+assert (
+    traced_quant_conv(ref_input_conv).value.all()
+    == export_ready_quant_conv(ref_input_conv).value.all()
+)
 
 print(traced_quant_linear.graph)
 print(export_ready_quant_linear.graph)
-assert traced_quant_linear(ref_input_linear).value.all() == export_ready_quant_linear(ref_input_linear).value.all()
+assert (
+    traced_quant_linear(ref_input_linear).value.all()
+    == export_ready_quant_linear(ref_input_linear).value.all()
+)

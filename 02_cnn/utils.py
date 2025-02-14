@@ -53,7 +53,9 @@ def accuracy(output, target, topk=(1,), stable=False):
             import numpy as np
 
             pred = np.argmax(output.cpu().numpy(), axis=1)
-            pred = torch.tensor(pred, device=target.device, dtype=target.dtype).unsqueeze(0)
+            pred = torch.tensor(
+                pred, device=target.device, dtype=target.dtype
+            ).unsqueeze(0)
         else:
             maxk = max(topk)
             _, pred = output.topk(maxk, 1, True, True)
@@ -97,7 +99,9 @@ def validate(val_loader, model, stable=True):
     return top1.avg.cpu().numpy()
 
 
-def generate_dataset(dir, resize_shape=256, center_crop_shape=224, inception_preprocessing=False):
+def generate_dataset(
+    dir, resize_shape=256, center_crop_shape=224, inception_preprocessing=False
+):
     if inception_preprocessing:
         normalize = transforms.Normalize(mean=0.5, std=0.5)
     else:
@@ -118,7 +122,13 @@ def generate_dataset(dir, resize_shape=256, center_crop_shape=224, inception_pre
 
 
 def generate_dataloader(
-    dir, batch_size, num_workers, resize_shape, center_crop_shape, subset_size=None, inception_preprocessing=False
+    dir,
+    batch_size,
+    num_workers,
+    resize_shape,
+    center_crop_shape,
+    subset_size=None,
+    inception_preprocessing=False,
 ):
     dataset = generate_dataset(
         dir,
@@ -128,6 +138,8 @@ def generate_dataloader(
     )
     if subset_size is not None:
         dataset = torch.utils.data.Subset(dataset, list(range(subset_size)))
-    loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, pin_memory=True)
+    loader = torch.utils.data.DataLoader(
+        dataset, batch_size=batch_size, num_workers=num_workers, pin_memory=True
+    )
 
     return loader

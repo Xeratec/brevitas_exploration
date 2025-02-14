@@ -18,7 +18,9 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 warnings.filterwarnings("ignore", category=UserWarning, message=".*deprecated.*")
-warnings.filterwarnings("ignore", category=UserWarning, module="torch", message=".*experimental feature.*")
+warnings.filterwarnings(
+    "ignore", category=UserWarning, module="torch", message=".*experimental feature.*"
+)
 
 ### Brevitas Imports ###
 import brevitas.nn as qnn
@@ -87,8 +89,22 @@ QUANT_ACT_MAP = {
 }
 
 QUANT_IDENTITY_MAP = {
-    "signed": (qnn.QuantIdentity, {"act_quant": Int8ActPerTensorFloat, "return_quant_tensor": True, "bit_width": 7}),
-    "unsigned": (qnn.QuantIdentity, {"act_quant": Uint8ActPerTensorFloat, "return_quant_tensor": True, "bit_width": 7}),
+    "signed": (
+        qnn.QuantIdentity,
+        {
+            "act_quant": Int8ActPerTensorFloat,
+            "return_quant_tensor": True,
+            "bit_width": 7,
+        },
+    ),
+    "unsigned": (
+        qnn.QuantIdentity,
+        {
+            "act_quant": Uint8ActPerTensorFloat,
+            "return_quant_tensor": True,
+            "bit_width": 7,
+        },
+    ),
 }
 
 model_quant = quantize(
@@ -102,7 +118,9 @@ model_quant = quantize(
 def calibrate_model(model, calib_loader, device):
     model.eval()
     model.to(device)
-    with torch.no_grad(), calibration_mode(model), tqdm(calib_loader, desc="Calibrating") as pbar:
+    with torch.no_grad(), calibration_mode(model), tqdm(
+        calib_loader, desc="Calibrating"
+    ) as pbar:
         for images, _ in pbar:
             images = images.to(device)
             images = images.to(torch.float)
@@ -111,10 +129,17 @@ def calibrate_model(model, calib_loader, device):
 
 # Load Calibration Dataset
 transform = transforms.Compose(
-    [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]  # Normalize with mean=0.5, std=0.5
+    [
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,)),
+    ]  # Normalize with mean=0.5, std=0.5
 )
-test_dataset = datasets.MNIST(root=EXPORT_FOLDER / "data", train=False, download=True, transform=transform)
-test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True)
+test_dataset = datasets.MNIST(
+    root=EXPORT_FOLDER / "data", train=False, download=True, transform=transform
+)
+test_loader = DataLoader(
+    test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True
+)
 
 calibrate_model(model=model_quant, calib_loader=test_loader, device=DEVICE_GPU)
 

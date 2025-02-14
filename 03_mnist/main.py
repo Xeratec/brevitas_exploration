@@ -16,7 +16,9 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 warnings.filterwarnings("ignore", category=UserWarning, message=".*deprecated.*")
-warnings.filterwarnings("ignore", category=UserWarning, module="torch", message=".*experimental feature.*")
+warnings.filterwarnings(
+    "ignore", category=UserWarning, module="torch", message=".*experimental feature.*"
+)
 
 ### Brevitas Imports ###
 import brevitas.nn as qnn
