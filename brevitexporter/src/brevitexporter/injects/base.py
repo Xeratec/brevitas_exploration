@@ -5,37 +5,42 @@
 # Federico Brancasi <fbrancasi@ethz.ch>
 
 """
-Single transformation class that handles:
-- module type matching
-- forward injection
-- validation (output_before vs output_after)
-- applying the transform to all submodules
+Base transformation infrastructure for the Brevitas export process.
+
+This module provides the foundational TransformationPass class that handles:
+- Module type matching
+- Forward method injection
+- Output validation
+- Recursive submodule transformation
 """
 
 import torch
 import torch.nn as nn
 from typing import Any, Optional, Callable, Union, Tuple
+from ..custom_tracer import CustomBrevitasTracer
 
 
 class TransformationPass:
     """
-    A generic transformation pass:
-      - module_cls: the module type(s) to match (e.g. QuantWeightBiasInputOutputLayer)
-      - injection_fn: a function that modifies the module's forward
-      - validation_tol: numeric tolerance for output comparison
+    Generic transformation pass for modifying Brevitas modules.
+
+    A transformation pass targets specific module types and applies custom forward
+    implementations while ensuring output consistency.
     """
 
     def __init__(
         self,
         module_cls: Union[type, Tuple[type, ...]],
-        injection_fn: Callable[[nn.Module], None],
+        injection_fn: Callable[..., None],
         validation_tol: float = 1e-6,
     ) -> None:
         """
+        Initialize a transformation pass.
+
         Args:
-            module_cls: The class (or tuple of classes) this pass should target.
-            injection_fn: A callable that receives the module and modifies its forward.
-            validation_tol: Tolerance for output comparison in validate_transformation.
+            module_cls: Module class(es) this transformation targets.
+            injection_fn: Function that modifies the module's forward pass.
+            validation_tol: Tolerance for numerical comparison in validation.
         """
         self.module_cls = module_cls
         self.injection_fn = injection_fn
@@ -43,22 +48,22 @@ class TransformationPass:
 
     def check_module_type(self, module: nn.Module) -> bool:
         """
-        Returns True if 'module' is an instance of self.module_cls, False otherwise.
+        Check if a module is an instance of the target class(es).
 
         Args:
-            module: A PyTorch module to check.
+            module: Module to check.
 
         Returns:
-            True if module is an instance of self.module_cls, else False.
+            bool: True if module is an instance of self.module_cls.
         """
         return isinstance(module, self.module_cls)
 
     def inject_forward(self, module: nn.Module) -> None:
         """
-        Calls the user-provided injection_fn to modify the module's forward pass.
+        Inject the custom forward implementation into a module.
 
         Args:
-            module: The module whose forward will be replaced.
+            module: Module whose forward method will be replaced.
         """
         self.injection_fn(module)
 
@@ -66,34 +71,39 @@ class TransformationPass:
         self, output_before: Any, output_after: Any, atol: Optional[float] = None
     ) -> bool:
         """
-        Checks if output_before and output_after match within a tolerance.
-        By default, uses self.validation_tol if 'atol' is not specified.
+        Validate transformation by comparing outputs.
 
         Args:
-            output_before: The output of the model before transformation.
-            output_after: The output of the model after transformation.
-            atol: Absolute tolerance for comparison.
+            output_before: Model output before transformation.
+            output_after: Model output after transformation.
+            atol: Optional custom tolerance for comparison.
 
         Returns:
-            True if outputs match within the given tolerance, False otherwise.
+            bool: True if outputs match within tolerance.
         """
         if atol is None:
             atol = self.validation_tol
         return torch.allclose(output_before, output_after, atol=atol)
 
-    def transform(self, model: nn.Module) -> bool:
+    def transform(
+        self, model: nn.Module, tracer: Optional[CustomBrevitasTracer] = None
+    ) -> bool:
         """
-        Applies the injection to all matching submodules in 'model'.
+        Apply the transformation to all matching submodules.
 
         Args:
-            model: The PyTorch model containing submodules to be transformed.
+            model: Model containing submodules to transform.
+            tracer: Optional tracer for registering transformed modules.
 
         Returns:
-            True if at least one submodule was modified, False otherwise.
+            bool: True if any modules were transformed.
         """
         transform_done = False
         for _, submodule in model.named_modules():
             if self.check_module_type(submodule):
-                self.inject_forward(submodule)
+                if tracer:
+                    self.injection_fn(submodule, tracer)
+                else:
+                    self.injection_fn(submodule)
                 transform_done = True
         return transform_done

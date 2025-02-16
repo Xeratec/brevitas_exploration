@@ -69,7 +69,6 @@ def main() -> None:
     model = SimpleQuantModel().eval()
     dummy_input = torch.randn(1, 3, 32, 32)
     fx_model = exportBrevitas(model, dummy_input, debug=True)
-    print("\nFX Graph exported successfully in example_usage.py")
 
 
 if __name__ == "__main__":

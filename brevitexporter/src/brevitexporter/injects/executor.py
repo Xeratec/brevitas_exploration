@@ -5,47 +5,65 @@
 # Federico Brancasi <fbrancasi@ethz.ch>
 
 """
-Executor class for handling transformation sequences.
+Executor module for handling transformation sequences in the Brevitas export process.
 """
 
 import torch
 import torch.nn as nn
-from typing import List
+from typing import List, Optional
 from .base import TransformationPass
+from ..custom_tracer import CustomBrevitasTracer
 
 # ANSI color codes
 BLUE = "\033[94m"
+RED = "\033[91m"
 ENDC = "\033[0m"
-CHECK = "✓"
 
 
 class TransformationExecutor:
     """
-    Executes a list of TransformationPass objects in sequence.
+    Manages and executes a sequence of model transformations.
+
+    The executor applies each transformation in sequence, validating that model outputs
+    remain consistent after each transformation step.
     """
 
     def __init__(
-        self, transformations: List[TransformationPass], debug: bool = False
+        self,
+        transformations: List[TransformationPass],
+        debug: bool = False,
+        tracer: Optional[CustomBrevitasTracer] = None,
     ) -> None:
         """
+        Initialize the transformation executor.
+
         Args:
-            transformations: A list of TransformationPass objects.
-            debug: If True, prints a success message after each transformation.
+            transformations: List of transformation passes to apply.
+            debug: Whether to print debug information during execution.
+            tracer: Optional CustomBrevitasTracer instance for module registration.
         """
         self.transformations = transformations
         self.debug = debug
+        self.tracer = tracer
 
     def execute(self, model: nn.Module, example_input: torch.Tensor) -> nn.Module:
         """
-        Executes all transformations in sequence on the provided model.
-        Validates the outputs before and after each transformation step.
+        Execute all transformations on the model in sequence.
+
+        For each transformation:
+        1. Apply the transformation
+        2. Validate that model outputs remain consistent
+        3. Update the reference output for the next transformation
 
         Args:
-            model: The PyTorch model to be transformed.
-            example_input: A sample input for validation after each transformation pass.
+            model: The PyTorch model to transform.
+            example_input: A representative input tensor for validation.
 
         Returns:
-            The modified model (in-place transformations).
+            nn.Module: The transformed model.
+
+        Raises:
+            RuntimeError: If any transformation results in output mismatch.
         """
         model.eval()
         with torch.no_grad():
@@ -54,28 +72,25 @@ class TransformationExecutor:
                 output_before = output_before[0]
 
             for transformation in self.transformations:
-                # transform() modifies any submodules of 'model' that match the pass
-                if transformation.transform(model):
+                if transformation.transform(model, tracer=self.tracer):
                     output_after = model(example_input)
                     if isinstance(output_after, tuple):
                         output_after = output_after[0]
 
-                    # Validate the transformation
                     if not transformation.validate_transformation(
                         output_before, output_after
                     ):
                         raise RuntimeError(
-                            f"{transformation.__class__.__name__} failed - outputs mismatch"
+                            f"{RED} ✗ {transformation.__class__.__name__} failed - outputs mismatch{ENDC}"
                         )
 
-                    # Debug message if everything is fine
                     if self.debug:
                         print(
-                            f"{BLUE}{CHECK} {transformation.__class__.__name__} "
-                            f"transformation successful - outputs match{ENDC}"
+                            f"{BLUE} ✓ {transformation.__class__.__name__} transformation successful\n{ENDC}"
+                            f"      leaf_classes: {self.tracer.leaf_classes}\n"
+                            f"      non_leaf_classes: {self.tracer.non_leaf_classes}\n"
                         )
 
-                    # Update for next pass
                     output_before = output_after
 
         return model

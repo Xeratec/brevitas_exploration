@@ -5,8 +5,12 @@
 # Federico Brancasi <fbrancasi@ethz.ch>
 
 """
-Main export function that applies the injection passes and performs FX tracing
-using CustomBrevitasTracer.
+Main export functionality for Brevitas quantized networks.
+
+This module provides the primary exportBrevitas function that handles:
+- Transformation pass orchestration
+- Custom tracer configuration
+- FX graph generation
 """
 
 import torch
@@ -17,43 +21,51 @@ from .injects.transformations import (
     MHATransformation,
 )
 from .injects.executor import TransformationExecutor
-from .custom_tracer import custom_brevitas_trace
+from .custom_tracer import CustomBrevitasTracer, custom_brevitas_trace
 
 # ANSI color codes
 BLUE = "\033[94m"
 ENDC = "\033[0m"
-CHECK = "✓"
 
 
 def exportBrevitas(
     model: nn.Module, example_input: torch.Tensor, debug: bool = False
 ) -> nn.Module:
     """
-    Export a Brevitas-based model to an FX GraphModule with unrolled quantization steps.
+    Export a Brevitas model to an FX GraphModule with unrolled quantization operations.
+
+    This function applies a series of transformations to make the quantization steps
+    explicit in the model's computation graph, then traces the transformed model using
+    a custom FX tracer.
 
     Args:
-        model: The Brevitas-based PyTorch model to export.
-        example_input: A representative input tensor (used for shape inference).
-        debug: If True, prints transformation progress and a success message at the end.
+        model: The Brevitas-based model to export.
+        example_input: A representative input tensor for shape tracing.
+        debug: If True, prints transformation progress information.
 
     Returns:
-        An FX GraphModule of the transformed model, with unrolled quantization steps.
+        nn.Module: An FX GraphModule with explicit quantization operations.
     """
-    # Define transformation sequence
+    # Create transformation sequence
     transformations = [
         MHATransformation(),
         LinearTransformation(),
         ActivationTransformation(),
     ]
 
-    # Create and execute the transformation sequence
-    executor = TransformationExecutor(transformations, debug=debug)
+    # Initialize custom tracer
+    tracer = CustomBrevitasTracer(debug=debug)
+
+    # Create and execute transformation sequence
+    executor = TransformationExecutor(transformations, debug=debug, tracer=tracer)
     transformed_model = executor.execute(model, example_input)
 
-    # Perform final FX tracing
-    fx_model = custom_brevitas_trace(transformed_model, concrete_args=(example_input,))
+    # Generate FX graph using the same tracer
+    fx_model = custom_brevitas_trace(
+        transformed_model, concrete_args=(example_input,), tracer=tracer
+    )
 
     if debug:
-        print(f"\n{BLUE}All transformations completed successfully!{ENDC}")
+        print(f"{BLUE} ✓ All transformations completed successfully!{ENDC}")
 
     return fx_model
