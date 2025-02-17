@@ -12,11 +12,12 @@ This module provides specific transformation passes for each type of quantized m
 - Activation functions (QuantReLU, QuantSigmoid)
 - Multi-head attention (QuantMultiheadAttention)
 
-Each transformation class customizes the base TransformationPass with appropriate
-module_cls, injection_fn, and validation settings.
+Each transformation class implements the abstract inject_forward method from TransformationPass
+to define its specific module transformation logic.
 """
 
 import torch.nn as nn
+from typing import Optional
 from brevitas.nn.quant_layer import (
     QuantWeightBiasInputOutputLayer,
     QuantNonLinearActLayer,
@@ -39,29 +40,30 @@ class LinearTransformation(TransformationPass):
     """
 
     def __init__(self) -> None:
-        """
-        Initialize the linear transformation pass.
-
-        Sets up the injection function to:
-        1. Install the wrapped inner forward implementation
-        2. Replace the forward method
-        3. Register appropriate leaf/non-leaf module classes
-        """
-
-        def injection_fn(module: nn.Module, tracer: CustomBrevitasTracer) -> None:
-            # For Linear layers, wrap the inner forward implementation
-            module.wrapped_inner_forward_impl = InnerForwardImplWrapperLinear(
-                module.inner_forward_impl
-            )
-            module.forward = quantWBIOL_forward.__get__(module)
-            tracer.register_leaf_module(InnerForwardImplWrapperLinear)
-            tracer.register_non_leaf_module(QuantWeightBiasInputOutputLayer)
-
+        """Initialize the linear transformation pass."""
         super().__init__(
             module_cls=QuantWeightBiasInputOutputLayer,
-            injection_fn=injection_fn,
             validation_tol=1e-6,
         )
+
+    def inject_forward(
+        self, module: nn.Module, tracer: Optional[CustomBrevitasTracer] = None
+    ) -> None:
+        """
+        Inject custom forward implementation for linear layers.
+
+        Args:
+            module: The linear module to transform.
+            tracer: Optional tracer for registering transformed modules.
+        """
+        module.wrapped_inner_forward_impl = InnerForwardImplWrapperLinear(
+            module.inner_forward_impl
+        )
+        module.forward = quantWBIOL_forward.__get__(module)
+
+        if tracer:
+            tracer.register_leaf_module(InnerForwardImplWrapperLinear)
+            tracer.register_non_leaf_module(QuantWeightBiasInputOutputLayer)
 
 
 class ActivationTransformation(TransformationPass):
@@ -73,23 +75,26 @@ class ActivationTransformation(TransformationPass):
     """
 
     def __init__(self) -> None:
-        """
-        Initialize the activation transformation pass.
-
-        Sets up the injection function to:
-        1. Replace the forward method
-        2. Register the module as non-leaf for proper tracing
-        """
-
-        def injection_fn(module: nn.Module, tracer: CustomBrevitasTracer) -> None:
-            module.forward = quant_activation_forward.__get__(module)
-            tracer.register_non_leaf_module(QuantNonLinearActLayer)
-
+        """Initialize the activation transformation pass."""
         super().__init__(
             module_cls=QuantNonLinearActLayer,
-            injection_fn=injection_fn,
             validation_tol=1e-6,
         )
+
+    def inject_forward(
+        self, module: nn.Module, tracer: Optional[CustomBrevitasTracer] = None
+    ) -> None:
+        """
+        Inject custom forward implementation for activation layers.
+
+        Args:
+            module: The activation module to transform.
+            tracer: Optional tracer for registering transformed modules.
+        """
+        module.forward = quant_activation_forward.__get__(module)
+
+        if tracer:
+            tracer.register_non_leaf_module(QuantNonLinearActLayer)
 
 
 class MHATransformation(TransformationPass):
@@ -101,23 +106,23 @@ class MHATransformation(TransformationPass):
     """
 
     def __init__(self) -> None:
-        """
-        Initialize the MHA transformation pass.
-
-        Sets up the injection function to:
-        1. Replace the forward method with unrolled implementation
-        2. Register the module as non-leaf for proper tracing
-        """
-
-        def injection_fn(module: nn.Module, tracer: CustomBrevitasTracer) -> None:
-            # For MHA, we need to pass the class itself as the second arg to __get__().
-            module.forward = unrolled_quant_mha_forward.__get__(
-                module, QuantMultiheadAttention
-            )
-            tracer.register_non_leaf_module(QuantMultiheadAttention)
-
+        """Initialize the MHA transformation pass."""
         super().__init__(
             module_cls=QuantMultiheadAttention,
-            injection_fn=injection_fn,
             validation_tol=1e-5,
         )
+
+    def inject_forward(
+        self, module: nn.Module, tracer: Optional[CustomBrevitasTracer] = None
+    ) -> None:
+        """
+        Inject custom forward implementation for MHA layers.
+
+        Args:
+            module: The MHA module to transform.
+            tracer: Optional tracer for registering transformed modules.
+        """
+        module.forward = unrolled_quant_mha_forward.__get__(module)
+
+        if tracer:
+            tracer.register_non_leaf_module(QuantMultiheadAttention)

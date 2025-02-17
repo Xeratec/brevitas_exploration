@@ -16,11 +16,12 @@ This module provides the foundational TransformationPass class that handles:
 
 import torch
 import torch.nn as nn
-from typing import Any, Optional, Callable, Union, Tuple
+from abc import ABC, abstractmethod
+from typing import Any, Optional, Union, Tuple
 from ..custom_tracer import CustomBrevitasTracer
 
 
-class TransformationPass:
+class TransformationPass(ABC):
     """
     Generic transformation pass for modifying Brevitas modules.
 
@@ -31,7 +32,6 @@ class TransformationPass:
     def __init__(
         self,
         module_cls: Union[type, Tuple[type, ...]],
-        injection_fn: Callable[..., None],
         validation_tol: float = 1e-6,
     ) -> None:
         """
@@ -43,7 +43,6 @@ class TransformationPass:
             validation_tol: Tolerance for numerical comparison in validation.
         """
         self.module_cls = module_cls
-        self.injection_fn = injection_fn
         self.validation_tol = validation_tol
 
     def check_module_type(self, module: nn.Module) -> bool:
@@ -58,14 +57,18 @@ class TransformationPass:
         """
         return isinstance(module, self.module_cls)
 
-    def inject_forward(self, module: nn.Module) -> None:
+    @abstractmethod
+    def inject_forward(
+        self, module: nn.Module, tracer: Optional[CustomBrevitasTracer] = None
+    ) -> None:
         """
         Inject the custom forward implementation into a module.
 
         Args:
             module: Module whose forward method will be replaced.
+            tracer: Optional tracer for registering module classes.
         """
-        self.injection_fn(module)
+        pass
 
     def validate_transformation(
         self, output_before: Any, output_after: Any, atol: Optional[float] = None
@@ -101,9 +104,6 @@ class TransformationPass:
         transform_done = False
         for _, submodule in model.named_modules():
             if self.check_module_type(submodule):
-                if tracer:
-                    self.injection_fn(submodule, tracer)
-                else:
-                    self.injection_fn(submodule)
+                self.inject_forward(submodule, tracer)
                 transform_done = True
         return transform_done
