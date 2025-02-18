@@ -14,6 +14,22 @@ import torch.nn as nn
 import brevitas.nn as qnn
 from brevitas.quant.scaled_int import Int8ActPerTensorFloat, Int32Bias
 from brevitexporter.export_brevitas import exportBrevitas
+from brevitexporter.transform.graph_transformer import split_quant_nodes
+
+# from brevitexporter.transform.graph_transformer import split_quant_nodes
+
+# %% Import and setup model
+from pathlib import Path
+
+### PyTorch Imports ###
+import torch
+
+### Brevitas Import ###
+import brevitas.nn as qnn
+from brevitas.quant.scaled_int import Int8ActPerTensorFloat, Int32Bias
+from brevitas.export import export_onnx_qcdq, export_qonnx
+from brevitas.export.inference import quant_inference_mode
+from brevitas.export.onnx.manager import ONNXBaseManager
 
 
 class SimpleQuantNN(nn.Module):
@@ -97,11 +113,66 @@ def test_simple_quant_nn() -> None:
     model = SimpleQuantNN().eval()
     sample_input = torch.randn(1, 4, 16)  # [batch=1, 4, 16 features]
 
+    EXPORT_FOLDER = Path().cwd()
+    print(EXPORT_FOLDER)
+    if Path().cwd().name != "onnx":
+        EXPORT_FOLDER = EXPORT_FOLDER / "onnx"
+
+    # export_onnx_qcdq(
+    #     model,
+    #     args=sample_input,
+    #     export_path=EXPORT_FOLDER / "01_quant_model_qcdq.onnx",
+    #     opset_version=13,
+    # )
+    # export_qonnx(
+    #     model,
+    #     args=sample_input,
+    #     export_path=EXPORT_FOLDER / "01_quant_model_qonnx.onnx",
+    #     opset_version=13,
+    # )
+
     # Export the model using Brevitas
     print("\n=== ExportBrevitas on a simple Quant Neural Network ===\n")
     fx_model = exportBrevitas(model, sample_input, debug=True)
 
-    print("Traced Model FX Graph Structure:\n")
+    print("\nOriginal Model FX Graph Structure:\n")
     fx_model.graph.print_tabular()
+    fx_model_output = fx_model(sample_input)
+
+    # export_onnx_qcdq(
+    #     fx_model,
+    #     args=sample_input,
+    #     export_path=EXPORT_FOLDER / "exported_01_quant_model_qcdq.onnx",
+    #     opset_version=13,
+    # )
+    # export_qonnx(
+    #     fx_model,
+    #     args=sample_input,
+    #     export_path=EXPORT_FOLDER / "exported_01_quant_model_qonnx.onnx",
+    #     opset_version=13,
+    # )
+
+    print("\n=== Transforming Graph ===\n")
+    transformed_model = split_quant_nodes(fx_model)
+
+    print("\nTransformed Model FX Graph Structure:\n")
+    transformed_model.graph.print_tabular()
+    transformed_model_output = transformed_model(sample_input)
+
+    export_onnx_qcdq(
+        transformed_model,
+        args=sample_input,
+        export_path=EXPORT_FOLDER / "transformed_01_quant_model_qcdq.onnx",
+        opset_version=13,
+    )
+    export_qonnx(
+        transformed_model,
+        args=sample_input,
+        export_path=EXPORT_FOLDER / "transformed_01_quant_model_qonnx.onnx",
+        opset_version=13,
+    )
+
+    # Check if the output are the same
+    assert torch.allclose(fx_model_output, transformed_model_output, atol=1e-6)
 
     print("\nTest completed successfully!")

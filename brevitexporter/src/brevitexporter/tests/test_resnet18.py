@@ -19,6 +19,7 @@ from brevitas.quant import (
 from brevitas.graph.quantize import quantize
 
 from brevitexporter.export_brevitas import exportBrevitas
+from brevitexporter.transform.graph_transformer import split_quant_nodes
 
 
 def prepare_resnet18_model() -> nn.Module:
@@ -129,5 +130,16 @@ def test_resnet18_quant_export() -> None:
 
     print("Traced Model FX Graph Structure:\n")
     fx_model.graph.print_tabular()
+    fx_model_output = fx_model(sample_input)
+
+    print("\n=== Transforming Graph ===\n")
+    transformed_model = split_quant_nodes(fx_model)
+
+    print("\nTransformed Model FX Graph Structure:\n")
+    transformed_model.graph.print_tabular()
+    transformed_model_output = transformed_model(sample_input)
+
+    # Check if the output are the same
+    assert torch.allclose(fx_model_output, transformed_model_output, atol=1e-6)
 
     print("\nTest completed successfully!")
