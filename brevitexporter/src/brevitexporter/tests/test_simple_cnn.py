@@ -12,7 +12,11 @@ and exporting it via the exportBrevitas function.
 import torch
 import torch.nn as nn
 import brevitas.nn as qnn
-from brevitas.quant.scaled_int import Int8ActPerTensorFloat, Int32Bias
+from brevitas.quant.scaled_int import (
+    Int8ActPerTensorFloat,
+    Int32Bias,
+    Int8WeightPerTensorFloat,
+)
 from brevitexporter.export_brevitas import exportBrevitas
 
 
@@ -43,6 +47,8 @@ class SimpleQuantCNN(nn.Module):
             bias=True,
             weight_bit_width=4,
             bias_quant=Int32Bias,
+            input_quant=Int8ActPerTensorFloat,
+            weight_quant=Int8WeightPerTensorFloat,
             output_quant=Int8ActPerTensorFloat,
             return_quant_tensor=True,
         )
@@ -58,6 +64,8 @@ class SimpleQuantCNN(nn.Module):
             bias=True,
             weight_bit_width=4,
             bias_quant=Int32Bias,
+            input_quant=Int8ActPerTensorFloat,
+            weight_quant=Int8WeightPerTensorFloat,
             output_quant=Int8ActPerTensorFloat,
             return_quant_tensor=True,
         )
@@ -117,7 +125,7 @@ def test_simple_quant_cnn() -> None:
     print("\n=== ExportBrevitas on a simple quantized CNN model ===\n")
     fx_model = exportBrevitas(model, sample_input, debug=True)
 
-    print("Traced Model FX Graph Structure:\n")
+    print("\nFinal FX Graph Structure:\n")
     fx_model.graph.print_tabular()
 
     print("\nTest completed successfully!")

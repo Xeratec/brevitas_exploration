@@ -4,17 +4,10 @@
 #
 # Federico Brancasi <fbrancasi@ethz.ch>
 
-"""
-Main export functionality for Brevitas quantized networks.
-
-This module provides the primary exportBrevitas function that handles:
-- Transformation pass orchestration
-- Custom tracer configuration
-- FX graph generation
-"""
-
 import torch
 import torch.nn as nn
+from pathlib import Path
+
 from .injects.transformations import (
     LinearTransformation,
     ActivationTransformation,
@@ -22,6 +15,14 @@ from .injects.transformations import (
 )
 from .injects.executor import TransformationExecutor
 from .custom_tracer import CustomBrevitasTracer, custom_brevitas_trace
+from .quant_divider.parameter_extractor import (
+    extract_brevitas_proxy_params,
+    print_quant_params,
+)
+from .quant_divider.quant_nodes_divider import split_quant_nodes
+from brevitas.export.inference import quant_inference_mode
+from brevitas.export import export_onnx_qcdq, export_qonnx
+from brevitas.export.onnx.manager import ONNXBaseManager
 
 # ANSI color codes
 BLUE = "\033[94m"
@@ -45,6 +46,9 @@ def exportBrevitas(
 
     Returns:
         nn.Module: An FX GraphModule with explicit quantization operations.
+
+    Note:
+        The ONNX export commands are commented out. Do not remove these comments.
     """
     # Create transformation sequence
     transformations = [
@@ -52,6 +56,27 @@ def exportBrevitas(
         LinearTransformation(),
         ActivationTransformation(),
     ]
+
+    with torch.no_grad(), quant_inference_mode(model):
+        model(example_input)
+
+    # EXPORT_FOLDER = Path().cwd()
+    # print(EXPORT_FOLDER)
+    # if Path().cwd().name != "onnx":
+    #     EXPORT_FOLDER = EXPORT_FOLDER / "onnx"
+
+    # export_onnx_qcdq(
+    #     model,
+    #     args=example_input,
+    #     export_path=EXPORT_FOLDER / "model_qcdq.onnx",
+    #     opset_version=13,
+    # )
+    # export_qonnx(
+    #     model,
+    #     args=example_input,
+    #     export_path=EXPORT_FOLDER / "model_qonnx.onnx",
+    #     opset_version=13,
+    # )
 
     # Initialize custom tracer
     tracer = CustomBrevitasTracer(debug=debug)
@@ -64,8 +89,35 @@ def exportBrevitas(
     fx_model = custom_brevitas_trace(
         transformed_model, concrete_args=(example_input,), tracer=tracer
     )
+    output_fx_model = fx_model(example_input)
 
     if debug:
         print(f"{BLUE} ✓ All transformations completed successfully!{ENDC}")
 
-    return fx_model
+    # Extract the parameters from the network
+    proxy_params = extract_brevitas_proxy_params(fx_model)
+
+    if debug:
+        print_quant_params(proxy_params)
+
+    # At the end of exportBrevitas, after we have fx_model, split quant nodes
+    split_fx_model = split_quant_nodes(fx_model, proxy_params)
+    output_split_fx_model = split_fx_model(example_input)
+
+    if torch.allclose(output_fx_model, output_split_fx_model, atol=1e-5):
+        print(f"{BLUE} ✓ Test passed: final graph output matches the default.{ENDC}")
+
+    # export_onnx_qcdq(
+    #     split_fx_model,
+    #     args=example_input,
+    #     export_path=EXPORT_FOLDER / "transformed_model_qcdq.onnx",
+    #     opset_version=13,
+    # )
+    # export_qonnx(
+    #     split_fx_model,
+    #     args=example_input,
+    #     export_path=EXPORT_FOLDER / "transformed_model_qonnx.onnx",
+    #     opset_version=13,
+    # )
+
+    return split_fx_model

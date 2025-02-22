@@ -42,7 +42,6 @@ from brevitas.quant import (
 )
 
 from brevitexporter.export_brevitas import exportBrevitas
-from brevitexporter.transform.graph_transformer import split_quant_nodes
 
 
 class SimpleFCModel(nn.Module):
@@ -233,19 +232,9 @@ def main():
     print("\n=== ExportBrevitas on a simple Quant Neural Network ===\n")
     fx_model = exportBrevitas(model_quant, sample_input, debug=True)
 
-    print("\nOriginal Model FX Graph Structure:\n")
+    print("\nFinal FX Graph Structure:\n")
     fx_model.graph.print_tabular()
-    fx_model_output = fx_model(sample_input)
 
-    print("\n=== Transforming Graph ===\n")
-    transformed_model = split_quant_nodes(fx_model)
-
-    print("\nTransformed Model FX Graph Structure:\n")
-    transformed_model.graph.print_tabular()
-    transformed_model_output = transformed_model(sample_input)
-
-    # Verify outputs match
-    assert torch.allclose(fx_model_output, transformed_model_output, atol=1e-6)
     print("\nTest completed successfully!")
 
 

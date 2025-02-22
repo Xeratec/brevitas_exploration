@@ -15,6 +15,13 @@ import brevitas.nn as qnn
 from torch import Tensor
 from brevitexporter.export_brevitas import exportBrevitas
 
+from brevitas.quant.scaled_int import (
+    Int8ActPerTensorFloat,
+    Int32Bias,
+    Int8WeightPerTensorFloat,
+    Uint8ActPerTensorFloat,
+)
+
 
 class SimpleQuantMHA(nn.Module):
     """
@@ -36,6 +43,17 @@ class SimpleQuantMHA(nn.Module):
             bias=False,
             packed_in_proj=False,  # separate Q, K, V
             batch_first=False,  # expects (sequence, batch, embed_dim)
+            in_proj_input_quant=Int8ActPerTensorFloat,
+            in_proj_weight_quant=Int8WeightPerTensorFloat,
+            in_proj_bias_quant=Int32Bias,
+            attn_output_weights_quant=Uint8ActPerTensorFloat,
+            q_scaled_quant=Int8ActPerTensorFloat,
+            k_transposed_quant=Int8ActPerTensorFloat,
+            v_quant=Int8ActPerTensorFloat,
+            out_proj_input_quant=Int8ActPerTensorFloat,
+            out_proj_weight_quant=Int8WeightPerTensorFloat,
+            out_proj_bias_quant=Int32Bias,
+            out_proj_output_quant=Int8ActPerTensorFloat,
         )
 
     def forward(self, x: Tensor) -> Tensor:
@@ -70,7 +88,7 @@ def test_simple_quant_mha() -> None:
     print("\n=== ExportBrevitas on a simple QuantMultiheadAttention model ===\n")
     fx_model = exportBrevitas(model, sample_input, debug=True)
 
-    print("Traced Model FX Graph Structure:\n")
+    print("\nFinal FX Graph Structure:\n")
     fx_model.graph.print_tabular()
 
     print("\nTest completed successfully!")

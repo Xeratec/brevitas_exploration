@@ -30,7 +30,11 @@ test-cnn:
 
 # Target for running resnet test
 test-resnet:
-	python -m pytest -v -s $(TEST_DIR)/test_resnet18.py
+	python -m pytest $(PYTEST_FLAGS) $(TEST_DIR)/test_resnet18.py
+
+# Target for running mnist test
+test-mnist:
+	python src/brevitexporter/tests/test_mnist.py
 
 # Target for running a specific test (usage: make test-single TEST=test_simple_nn.py)
 test-single:
