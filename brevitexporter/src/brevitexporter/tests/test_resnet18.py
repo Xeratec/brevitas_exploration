@@ -126,4 +126,3 @@ def test_resnet18_quant_export() -> None:
     sample_input = torch.randn(1, 3, 224, 224)
 
     fx_model = exportBrevitas(quantized_model, sample_input, debug=True)
-

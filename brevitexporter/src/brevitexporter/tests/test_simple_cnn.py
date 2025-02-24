@@ -123,4 +123,3 @@ def test_simple_quant_cnn() -> None:
     sample_input = torch.randn(1, 1, 28, 28)
 
     fx_model = exportBrevitas(model, sample_input, debug=True)
-
