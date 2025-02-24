@@ -23,6 +23,7 @@ from .quant_divider.quant_nodes_divider import split_quant_nodes
 from brevitas.export.inference import quant_inference_mode
 from brevitas.export import export_onnx_qcdq, export_qonnx
 from brevitas.export.onnx.manager import ONNXBaseManager
+from torch.fx.graph_module import GraphModule
 
 # ANSI color codes
 BLUE = "\033[94m"
@@ -50,6 +51,15 @@ def exportBrevitas(
     Note:
         The ONNX export commands are commented out. Do not remove these comments.
     """
+
+    from brevitas.fx import brevitas_symbolic_trace
+
+    model = brevitas_symbolic_trace(model)
+    if debug:
+        print("\n=== Original Network ===\n")
+        model.graph.print_tabular()
+        print()
+
     # Create transformation sequence
     transformations = [
         MHATransformation(),
@@ -89,10 +99,15 @@ def exportBrevitas(
     fx_model = custom_brevitas_trace(
         transformed_model, concrete_args=(example_input,), tracer=tracer
     )
+    fx_model.recompile()
     output_fx_model = fx_model(example_input)
 
     if debug:
         print(f"{BLUE} ✓ All transformations completed successfully!{ENDC}")
+
+    if debug:
+        print("\n=== Network after the Transformation ===\n")
+        fx_model.graph.print_tabular()
 
     # Extract the parameters from the network
     proxy_params = extract_brevitas_proxy_params(fx_model)
@@ -101,11 +116,18 @@ def exportBrevitas(
         print_quant_params(proxy_params)
 
     # At the end of exportBrevitas, after we have fx_model, split quant nodes
-    split_fx_model = split_quant_nodes(fx_model, proxy_params)
+    split_fx_model = split_quant_nodes(fx_model, proxy_params, debug)
+    split_fx_model.recompile()
     output_split_fx_model = split_fx_model(example_input)
 
+    if debug:
+        print("\n=== Network after the Split of Quant Nodes ===\n")
+        fx_model.graph.print_tabular()
+        print()
+
     if torch.allclose(output_fx_model, output_split_fx_model, atol=1e-5):
-        print(f"{BLUE} ✓ Test passed: final graph output matches the default.{ENDC}")
+        if debug:
+            print(f"{BLUE} ✓ Passed: final graph output matches the default.{ENDC}")
 
     # export_onnx_qcdq(
     #     split_fx_model,

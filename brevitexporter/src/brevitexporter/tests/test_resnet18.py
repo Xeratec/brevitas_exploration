@@ -125,10 +125,5 @@ def test_resnet18_quant_export() -> None:
     quantized_model = prepare_resnet18_model()
     sample_input = torch.randn(1, 3, 224, 224)
 
-    print("\n=== ExportBrevitas on a ResNet18 model ===\n")
     fx_model = exportBrevitas(quantized_model, sample_input, debug=True)
 
-    print("\nFinal FX Graph Structure:\n")
-    fx_model.graph.print_tabular()
-
-    print("\nTest completed successfully!")

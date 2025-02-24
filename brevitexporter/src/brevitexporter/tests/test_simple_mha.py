@@ -85,10 +85,4 @@ def test_simple_quant_mha() -> None:
     model = SimpleQuantMHA(embed_dim=16, num_heads=4).eval()
     sample_input = torch.randn(10, 2, 16)  # [sequence=10, batch=2, embed_dim=16]
 
-    print("\n=== ExportBrevitas on a simple QuantMultiheadAttention model ===\n")
     fx_model = exportBrevitas(model, sample_input, debug=True)
-
-    print("\nFinal FX Graph Structure:\n")
-    fx_model.graph.print_tabular()
-
-    print("\nTest completed successfully!")

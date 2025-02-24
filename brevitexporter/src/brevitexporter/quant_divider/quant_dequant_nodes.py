@@ -15,8 +15,11 @@ from typing import Any, Optional, Union
 
 class Quant(nn.Module):
     """
-    Fake-quant module that applies a “saturating” approach using scale/zero_point/bit_width
-    extracted from a Brevitas param dictionary.
+    Fake-quant module that applies a "saturating" approach using scale, zero_point, and bit_width
+    parameters extracted from a Brevitas parameter dictionary.
+
+    This module is used in the quantization export process to simulate quantization effects
+    on tensors by scaling, shifting, rounding, and clamping their values.
     """
 
     def __init__(
@@ -30,10 +33,10 @@ class Quant(nn.Module):
         Initialize the Quant module.
 
         Args:
-            original_module: The original Brevitas quant module (unused here, but kept for reference).
-            scale: Scale factor from extracted parameters (None if not available).
-            zero_point: Zero-point from extracted parameters (None if not available).
-            bit_width: Bit width from extracted parameters (e.g. 8.0, 32.0).
+            original_module: The original Brevitas quant module (kept for reference).
+            scale: Scale factor used for quantization.
+            zero_point: Zero-point used for quantization.
+            bit_width: Bit width for the quantized representation (e.g., 8.0, 32.0).
         """
         super().__init__()
         self.original_module = original_module
@@ -41,50 +44,65 @@ class Quant(nn.Module):
         self.zero_point = zero_point
         self.bit_width = bit_width
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Precompute clamping bounds based on the bit width and zero_point.
+        if self.bit_width is not None:
+            bw_int = int(self.bit_width)
+            if abs(self.zero_point) < 1e-5:
+                # For unsigned quantization, the range is [0, 2^bw - 1].
+                self.min_val = 0
+                self.max_val = (2**bw_int) - 1
+            else:
+                # For signed quantization, the range is [-2^(bw-1), 2^(bw-1) - 1].
+                self.min_val = -(2 ** (bw_int - 1))
+                self.max_val = (2 ** (bw_int - 1)) - 1
+        else:
+            self.min_val = None
+            self.max_val = None
+
+    def forward(self, *args: Any, **kwargs: Any) -> torch.Tensor:
         """
         Apply fake quantization to the input tensor.
 
-        The process is:
-          1) Scale the input by (1/scale) and shift by zero_point.
-          2) Round to the nearest integer.
-          3) Clamp to the representable range determined by bit_width.
-          4) Reconstruct the float value.
+        This method takes variable positional and keyword arguments.
+        The first positional argument is expected to be the input tensor.
+        Any additional arguments are ignored. This design choice is made to ensure
+        compatibility with FX graph nodes, which may pass extra arguments that are not
+        needed for the quantization computation.
+
+        The quantization process is as follows:
+          1) Scale the input tensor by 1/scale.
+          2) Shift the scaled tensor by the zero_point.
+          3) Round the shifted tensor to the nearest integer.
+          4) Clamp the rounded tensor to the representable range based on bit_width.
+          5) Reconstruct the dequantized tensor by reversing the shift and scale.
 
         Args:
-            x: Input tensor to be fake quantized.
+            *args: The first argument should be the input tensor. Additional positional
+                   arguments, if any, are ignored.
+            **kwargs: Additional keyword arguments (ignored).
 
         Returns:
             The fake quantized tensor.
         """
-        # If scale or zero_point are None, pass through
+        if not args:
+            raise ValueError(
+                "Expected at least one positional argument for the input tensor"
+            )
+        # Use the first argument as the input tensor.
+        x = args[0]
         if self.scale is None or self.zero_point is None:
             return x
 
-        # 1) Convert x to "scaled" domain
+        # Step 1: Scale the input tensor.
         x_scaled = x / self.scale
-        # 2) Shift by zero_point
+        # Step 2: Shift the scaled tensor by the zero_point.
         x_shifted = x_scaled + self.zero_point
-        # 3) Round
+        # Step 3: Round the shifted tensor to the nearest integer.
         x_rounded = torch.round(x_shifted)
-
-        # 3b) If we have a valid bit_width, clamp the integer domain
-        #    Distinguish between a “signed” range or “unsigned” range if needed.
-        #    Below is a simple guess: if zero_point == 0 => assume unsigned, else signed.
+        # Step 4: Clamp the rounded values to the representable range.
         if self.bit_width is not None:
-            bw_int = int(self.bit_width)
-            if abs(self.zero_point) < 1e-5:
-                # Assume unsigned range: [0, 2^bw - 1]
-                min_val = 0
-                max_val = (2**bw_int) - 1
-            else:
-                # Assume symmetric signed range: [-2^(bw-1), 2^(bw-1) - 1]
-                min_val = -(2 ** (bw_int - 1))
-                max_val = (2 ** (bw_int - 1)) - 1
-
-            x_rounded = torch.clamp(x_rounded, min_val, max_val)
-
-        # 4) Reconstruct the float tensor from quantized values.
+            x_rounded = torch.clamp(x_rounded, self.min_val, self.max_val)
+        # Step 5: Reconstruct the dequantized tensor.
         x_dequant = (x_rounded - self.zero_point) * self.scale
         return x_dequant
 

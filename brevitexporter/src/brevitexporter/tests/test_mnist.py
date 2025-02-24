@@ -131,7 +131,7 @@ def calibrate_model(
             model(images)
 
 
-def main():
+def test_mnist_quant_export() -> None:
     """Main execution function."""
     # Setup paths and device
     EXPORT_FOLDER = Path().cwd()
@@ -229,14 +229,4 @@ def main():
     sample_input = sample_input[0:1]
     print(f"Sample input shape: {sample_input.shape}")
 
-    print("\n=== ExportBrevitas on a simple Quant Neural Network ===\n")
     fx_model = exportBrevitas(model_quant, sample_input, debug=True)
-
-    print("\nFinal FX Graph Structure:\n")
-    fx_model.graph.print_tabular()
-
-    print("\nTest completed successfully!")
-
-
-if __name__ == "__main__":
-    main()

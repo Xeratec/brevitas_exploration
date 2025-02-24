@@ -23,12 +23,16 @@ from brevitas.nn.quant_layer import (
     QuantNonLinearActLayer,
 )
 from brevitas.nn.quant_mha import QuantMultiheadAttention
+from brevitas.nn.quant_activation import QuantIdentity
 
 from .base import TransformationPass
 from ..custom_forwards.linear import InnerForwardImplWrapperLinear, quantWBIOL_forward
-from ..custom_forwards.activations import quant_activation_forward
 from ..custom_forwards.multiheadattention import unrolled_quant_mha_forward
 from ..custom_tracer import CustomBrevitasTracer
+from ..custom_forwards.activations import (
+    InnerForwardImplWrapperActivation,
+    quant_activation_forward,
+)
 
 
 class LinearTransformation(TransformationPass):
@@ -87,13 +91,25 @@ class ActivationTransformation(TransformationPass):
         """
         Inject custom forward implementation for activation layers.
 
+        This method instantiates the original activation function (if provided) and
+        wraps it using InnerForwardImplWrapperActivation, then overrides the forward method.
+
         Args:
             module: The activation module to transform.
             tracer: Optional tracer for registering transformed modules.
         """
+        # If the activation implementation was provided (e.g. nn.ReLU for QuantReLU),
+        # instantiate it. Otherwise, default to an identity.
+        if hasattr(module, "act_impl") and module.act_impl is not None:
+            act_instance = module.act_impl()  # e.g. nn.ReLU()
+        else:
+            act_instance = nn.Identity()
+
+        module.wrapped_act_impl = InnerForwardImplWrapperActivation(act_instance)
         module.forward = quant_activation_forward.__get__(module)
 
         if tracer:
+            tracer.register_leaf_module(InnerForwardImplWrapperActivation)
             tracer.register_non_leaf_module(QuantNonLinearActLayer)
 
 

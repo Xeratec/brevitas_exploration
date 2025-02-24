@@ -66,7 +66,7 @@ def create_quant_dequant_nodes(
 
 
 def split_quant_nodes(
-    fx_model: fx.GraphModule, full_params_dict: Dict[str, Dict[str, Any]]
+    fx_model: fx.GraphModule, full_params_dict: Dict[str, Dict[str, Any]], debug: bool
 ) -> fx.GraphModule:
     """
     Transforms an FX graph by splitting each "call_module(...quant...)" node
@@ -85,12 +85,17 @@ def split_quant_nodes(
     graph = fx_model.graph
     nodes_to_erase: List[fx.Node] = []
 
-    print(f"{BLUE} › Starting quantization node splitting...{ENDC}")
+    if debug:
+       print(f"{BLUE} › Starting quantization node splitting...{ENDC}")
 
     all_nodes = list(graph.nodes)
 
     for node in all_nodes:
-        if node.op == "call_module" and "quant" in node.target.lower():
+        if (
+            node.op == "call_module"
+            and "quant" in node.target.lower()
+            and "act_impl" not in node.target.lower()
+        ):
             # The original module
             original_module = fx_model.get_submodule(node.target)
 
@@ -131,6 +136,7 @@ def split_quant_nodes(
         graph.erase_node(erase_node)
 
     graph.lint()
-    print(f"{BLUE} › Quantization node splitting completed successfully{ENDC}")
+    if debug:
+       print(f"{BLUE} › Quantization node splitting completed successfully{ENDC}")
 
     return fx_model

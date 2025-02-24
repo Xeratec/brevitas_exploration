@@ -122,10 +122,5 @@ def test_simple_quant_cnn() -> None:
     model = SimpleQuantCNN().eval()
     sample_input = torch.randn(1, 1, 28, 28)
 
-    print("\n=== ExportBrevitas on a simple quantized CNN model ===\n")
     fx_model = exportBrevitas(model, sample_input, debug=True)
 
-    print("\nFinal FX Graph Structure:\n")
-    fx_model.graph.print_tabular()
-
-    print("\nTest completed successfully!")

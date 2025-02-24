@@ -5,33 +5,65 @@
 # Federico Brancasi <fbrancasi@ethz.ch>
 
 """
-Custom forward implementations for Brevitas activation layers, 
-e.g., QuantReLU, QuantSigmoid, etc.
+Custom forward implementations for Brevitas QuantActivation layers.
 """
 
-from typing import Union
+import torch
+import torch.nn as nn
 from torch import Tensor
-from brevitas.quant_tensor import QuantTensor
 from brevitas.nn.quant_layer import QuantNonLinearActLayer
 
 
-def quant_activation_forward(
-    self: QuantNonLinearActLayer, inp: Union[Tensor, QuantTensor]
-) -> Union[Tensor, QuantTensor]:
+class InnerForwardImplWrapperActivation(nn.Module):
     """
-    Unrolled forward pass for a QuantNonLinearActLayer:
+    A small wrapper around the activation function of a Brevitas QuantActivation layer.
+
+    This wrapper exposes the original activation function as a standalone submodule
+    so that FX tracing can display it as a separate node.
+    """
+
+    def __init__(self, act_impl: nn.Module) -> None:
+        """
+        Args:
+            act_impl: The original activation function module (e.g. an instance of nn.ReLU).
+        """
+        super().__init__()
+        self.act_impl = act_impl
+
+    def forward(self, quant_input: Tensor) -> Tensor:
+        """
+        Applies the wrapped activation function.
+
+        Args:
+            quant_input: Input tensor after input quantization.
+
+        Returns:
+            Output tensor after applying the activation.
+        """
+        return self.act_impl(quant_input)
+
+
+def quant_activation_forward(self: QuantNonLinearActLayer, inp: Tensor) -> Tensor:
+    """
+    Unrolled forward pass for a Brevitas QuantActivation layer.
 
     Steps:
-      1) self.input_quant
-      2) self.act_quant
+      1) Apply self.input_quant to the input.
+      2) Apply the activation function via the wrapped activation implementation.
+      3) Apply self.act_quant to the activation output.
 
     Args:
-        self: The QuantNonLinearActLayer instance (passed automatically).
-        inp: Input Tensor or QuantTensor.
+        self: The QuantNonLinearActLayer instance.
+        inp: The input tensor.
 
     Returns:
-        The output after passing through input_quant and act_quant.
+        Output tensor after applying activation and output quantization.
     """
-    quant_input = self.input_quant(inp)
-    quant_output = self.act_quant(quant_input)
+    quant_input = self.input_quant(inp) if self.input_quant is not None else inp
+    # Use the wrapped activation if available; otherwise pass through.
+    if hasattr(self, "wrapped_act_impl"):
+        output = self.wrapped_act_impl(quant_input)
+    else:
+        output = quant_input
+    quant_output = self.act_quant(output) if self.act_quant is not None else output
     return quant_output

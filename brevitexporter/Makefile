@@ -34,7 +34,7 @@ test-resnet:
 
 # Target for running mnist test
 test-mnist:
-	python src/brevitexporter/tests/test_mnist.py
+	python -m pytest $(PYTEST_FLAGS) $(TEST_DIR)/test_mnist.py
 
 # Target for running a specific test (usage: make test-single TEST=test_simple_nn.py)
 test-single:

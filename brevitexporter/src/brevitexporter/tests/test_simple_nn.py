@@ -70,22 +70,22 @@ class SimpleQuantNN(nn.Module):
             return_quant_tensor=True,
         )
 
-        self.linear2 = qnn.QuantLinear(
-            in_features=hidden_features,
-            out_features=1,
-            bias=True,
-            weight_bit_width=4,
-            bias_quant=Int32Bias,
-            output_quant=Int8ActPerTensorFloat,
-            input_quant=Int8ActPerTensorFloat,
-            weight_quant=Int8WeightPerTensorFloat,
-            return_quant_tensor=True,
-        )
+        # self.linear2 = qnn.QuantLinear(
+        #     in_features=hidden_features,
+        #     out_features=1,
+        #     bias=True,
+        #     weight_bit_width=4,
+        #     bias_quant=Int32Bias,
+        #     output_quant=Int8ActPerTensorFloat,
+        #     input_quant=Int8ActPerTensorFloat,
+        #     weight_quant=Int8WeightPerTensorFloat,
+        #     return_quant_tensor=True,
+        # )
 
-        self.sigmoid = qnn.QuantSigmoid(
-            bit_width=4,
-            return_quant_tensor=True,
-        )
+        # self.sigmoid = qnn.QuantSigmoid(
+        #     bit_width=4,
+        #     return_quant_tensor=True,
+        # )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -100,8 +100,8 @@ class SimpleQuantNN(nn.Module):
         x = self.input_quant(x)
         x = self.linear1(x)
         x = self.relu(x)
-        x = self.linear2(x)
-        x = self.sigmoid(x)
+        # x = self.linear2(x)
+        # x = self.sigmoid(x)
         return x
 
 
@@ -121,8 +121,4 @@ def test_simple_quant_nn() -> None:
     sample_input = torch.randn(1, 4, 16)  # [batch=1, 4, 16 features]
 
     # Export the model using Brevitas
-    print("\n=== ExportBrevitas on a simple Quant Neural Network ===\n")
     fx_model = exportBrevitas(model, sample_input, debug=True)
-
-    print("\nFinal FX Graph Structure:\n")
-    fx_model.graph.print_tabular()
