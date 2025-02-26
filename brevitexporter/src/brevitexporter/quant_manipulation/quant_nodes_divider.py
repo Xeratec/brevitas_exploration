@@ -86,7 +86,7 @@ def split_quant_nodes(
     nodes_to_erase: List[fx.Node] = []
 
     if debug:
-        print(f"{BLUE} › Starting quantization node splitting...{ENDC}")
+        print(f"{BLUE} › Starting Quantization Node Splitting...{ENDC}")
 
     all_nodes = list(graph.nodes)
 
@@ -137,6 +137,6 @@ def split_quant_nodes(
 
     graph.lint()
     if debug:
-        print(f"{BLUE} › Quantization node splitting completed successfully{ENDC}")
+        print(f"{BLUE} › Quantization Node Splitting completed Successfully{ENDC}")
 
     return fx_model
