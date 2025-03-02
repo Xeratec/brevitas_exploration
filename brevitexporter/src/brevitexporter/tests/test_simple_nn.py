@@ -9,8 +9,6 @@ Test file demonstrating an example of a small neural network
 (Linear + ReLU + Linear + Sigmoid) and exporting it via the exportBrevitas function.
 """
 
-from pathlib import Path
-
 ### PyTorch Imports ###
 import torch
 import torch.nn as nn
@@ -21,6 +19,7 @@ from brevitas.quant.scaled_int import (
     Int8ActPerTensorFloat,
     Int32Bias,
     Int8WeightPerTensorFloat,
+    Uint8ActPerTensorFloat,
 )
 from brevitexporter.export_brevitas import exportBrevitas
 

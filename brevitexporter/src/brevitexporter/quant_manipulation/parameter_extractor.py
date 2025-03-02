@@ -5,16 +5,22 @@
 # Federico Brancasi <fbrancasi@ethz.ch>
 
 """
-Module for extracting quantization proxy parameters from an exported FX model.
+This module extracts quantization proxy parameters from an exported FX model.
+It retrieves scale, zero_point, bit_width and deduces the signedness of the quant
+modules in the model by using type- and attribute-based checks rather than string
+inspection.
+
+The safe_get_is_signed() function first looks for an explicit `is_signed` attribute,
+then uses the module's min_val (if available) to infer signedness (a negative value
+indicates signed quantization). If neither is available, it falls back to checking
+the zero_point (a zero or near-zero value suggests unsigned quantization).
+
+The extracted parameters are printed using a color-coded format.
 """
 
 from typing import Any, Dict
 import torch
 import torch.nn as nn
-import brevitas.nn as qnn
-from brevitas.export.inference import quant_inference_mode
-from brevitas.quant.scaled_int import Int8ActPerTensorFloat, Int32Bias
-
 from brevitas.proxy.runtime_quant import ActQuantProxyFromInjector
 from brevitas.proxy.parameter_quant import (
     WeightQuantProxyFromInjector,
@@ -25,13 +31,13 @@ from colorama import Fore, Style
 
 def safe_get_scale(quant_obj: Any) -> Any:
     """
-    Safely retrieve the scale from a Brevitas proxy object.
+    Safely retrieve the scale from a Brevitas quant proxy object.
 
     Args:
-        quant_obj: A Brevitas proxy object (e.g. ActQuantProxyFromInjector).
+        quant_obj: The quant proxy object.
 
     Returns:
-        The floating scale value if available, otherwise None.
+        The scale as a float if available, otherwise None.
     """
     if quant_obj is None:
         return None
@@ -50,13 +56,13 @@ def safe_get_scale(quant_obj: Any) -> Any:
 
 def safe_get_zero_point(quant_obj: Any) -> Any:
     """
-    Safely retrieve the zero_point from a Brevitas proxy object.
+    Safely retrieve the zero_point from a Brevitas quant proxy object.
 
     Args:
-        quant_obj: A Brevitas proxy object (e.g. ActQuantProxyFromInjector).
+        quant_obj: The quant proxy object.
 
     Returns:
-        The floating zero point value if available, otherwise None.
+        The zero_point as a float if available, otherwise None.
     """
     if quant_obj is None:
         return None
@@ -77,33 +83,61 @@ def safe_get_zero_point(quant_obj: Any) -> Any:
         return None
 
 
-def extract_brevitas_proxy_params(model: nn.Module) -> Dict[str, Dict[str, Any]]:
+def safe_get_is_signed(quant_obj: Any) -> bool:
     """
-    Recursively scan the post-exportBrevitas model to find all submodules of type:
-    ActQuantProxyFromInjector, WeightQuantProxyFromInjector, BiasQuantProxyFromInjector,
-    and retrieve scale, zero_point, and bit_width for each.
+    Determine whether a quant proxy/module is signed.
+
+    The function first checks for an explicit `is_signed` attribute.
+    If not found, it checks for a `min_val` attribute: a negative min_val
+    indicates signed quantization. If that is unavailable, it examines the
+    zero_point (if nearly zero, it is assumed unsigned). Defaults to True.
 
     Args:
-        model: A model that has already undergone exportBrevitas (custom forward injection).
+        quant_obj: The quant proxy object.
 
     Returns:
-        A dictionary of the form:
+        True if the quantization is signed, False otherwise.
+    """
+    if hasattr(quant_obj, "is_signed"):
+        return getattr(quant_obj, "is_signed")
+    if hasattr(quant_obj, "min_val"):
+        try:
+            return quant_obj.min_val < 0
+        except Exception:
+            pass
+    zp = safe_get_zero_point(quant_obj)
+    if zp is not None:
+        # If zero_point is near zero, assume unsigned quantization.
+        return not (abs(zp) < 1e-5)
+    return True
+
+
+def extract_brevitas_proxy_params(model: nn.Module) -> Dict[str, Dict[str, Any]]:
+    """
+    Recursively scan the exported FX model to find quant proxy submodules of types:
+    ActQuantProxyFromInjector, WeightQuantProxyFromInjector, or BiasQuantProxyFromInjector.
+    For each matching module, extract the scale, zero_point, bit_width, and deduced signedness.
+
+    Args:
+        model: The exported FX model.
+
+    Returns:
+        A dictionary mapping module names to their quantization parameters:
         {
             'module_name': {
                 'scale': float or None,
                 'zero_point': float or None,
-                'bit_width': float or None
+                'bit_width': float or None,
+                'is_signed': bool
             },
             ...
         }
     """
-    params_dict = {}
+    params_dict: Dict[str, Dict[str, Any]] = {}
 
     def recurse_modules(parent_mod: nn.Module, prefix: str = "") -> None:
         for child_name, child_mod in parent_mod.named_children():
             full_name = f"{prefix}.{child_name}" if prefix else child_name
-
-            # If it's one of the known proxies, extract params
             if isinstance(
                 child_mod,
                 (
@@ -114,17 +148,16 @@ def extract_brevitas_proxy_params(model: nn.Module) -> Dict[str, Dict[str, Any]]
             ):
                 scl = safe_get_scale(child_mod)
                 zp = safe_get_zero_point(child_mod)
-                bw = child_mod.bit_width()  # .bit_width() is typically a method
-
-                # Save to dictionary under a single "quant_params" sub-key if desired,
-                # but here we directly store them for simplicity.
+                bw = (
+                    child_mod.bit_width()
+                )  # Assumes bit_width() returns a numeric value.
+                is_signed = safe_get_is_signed(child_mod)
                 params_dict[full_name] = {
                     "scale": scl,
                     "zero_point": zp,
                     "bit_width": bw,
+                    "is_signed": is_signed,
                 }
-
-            # Recurse deeper
             recurse_modules(child_mod, prefix=full_name)
 
     recurse_modules(model)
@@ -133,20 +166,11 @@ def extract_brevitas_proxy_params(model: nn.Module) -> Dict[str, Dict[str, Any]]
 
 def print_quant_params(params_dict: Dict[str, Dict[str, Any]]) -> None:
     """
-    Print the quantization parameters for each proxy in a color-coded format.
+    Print the extracted quantization parameters for each proxy module in a
+    color-coded format.
 
     Args:
-        params_dict: Dictionary containing the quantization parameters.
-
-    Example structure:
-    {
-      'mha.q_proj.weight_quant': {
-         'scale': 0.0034,
-         'zero_point': 0.0,
-         'bit_width': 8.0
-      },
-      ...
-    }
+        params_dict: Dictionary containing quantization parameters.
     """
     print(f"\n{Fore.BLUE}Extracted Parameters from the Network:{Style.RESET_ALL}")
     for layer_name, quant_values in params_dict.items():

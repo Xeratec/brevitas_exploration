@@ -37,6 +37,11 @@ from brevitexporter.quant_manipulation.dequant_modifier import (
     unify_linear_dequants,
 )  # Unifies dequant nodes in linear layers
 from brevitas.fx import brevitas_symbolic_trace  # Brevitas-specific symbolic tracing
+from brevitexporter.utils.graph_printer import (
+    GraphModulePrinter,
+)  # Custom Graph Printer
+from brevitexporter.utils.fx_interpreter import NodeTracer  # Custom Graph Interpreter
+
 
 # ANSI color codes for improved debug output readability
 BLUE = "\033[94m"
@@ -72,6 +77,8 @@ def exportBrevitas(
             EXPORT_FOLDER / "onnx"
         )  # If not, create/use an 'onnx' subdirectory
 
+    printer = GraphModulePrinter()  # Instantiation of the custom printer
+
     ###############################################################################
     # 1. Original Network
     ###############################################################################
@@ -81,7 +88,7 @@ def exportBrevitas(
     )  # Symbolically trace the original model using Brevitas
     if debug:
         print("\n\n=== 1. Original Network ===\n")
-        model.graph.print_tabular()  # Display model graph in tabular format
+        printer.print_tabular(model)
         print()
 
     with (
@@ -92,6 +99,12 @@ def exportBrevitas(
             example_input
         )  # Compute original model output on example input for validation
 
+    # torch.onnx.export(  # Export original model to ONNX format with QCDQ (Quant-Cast-DeQuant) nodes
+    #     model,  # Model to export
+    #     args=example_input,  # Example input for tracing
+    #     f=EXPORT_FOLDER / "1_model_qcdq_original.onnx",
+    #     opset_version=13,
+    # )
     export_onnx_qcdq(  # Export original model to ONNX format with QCDQ (Quant-Cast-DeQuant) nodes
         model,  # Model to export
         args=example_input,  # Example input for tracing
@@ -129,6 +142,9 @@ def exportBrevitas(
     with torch.no_grad():
         output_fx_model = fx_model(example_input)  # Compute transformed model output
 
+    if isinstance(output_model, tuple):
+        output_model = output_model[0]
+
     if torch.allclose(
         output_fx_model, output_model, atol=1e-5
     ):  # Check numerical equivalence within tolerance
@@ -143,7 +159,7 @@ def exportBrevitas(
         print(f"{BLUE} ✓ All transformations completed successfully!{ENDC}")
     if debug:
         print("\n=== 2. Network after the Injection of New Modules ===\n")
-        fx_model.graph.print_tabular()  # Display transformed model graph
+        printer.print_tabular(fx_model)
 
     export_onnx_qcdq(  # Export transformed model to ONNX
         fx_model,  # Transformed model
@@ -171,13 +187,14 @@ def exportBrevitas(
         fx_model, proxy_params, debug
     )  # Transform quant nodes into quant-dequant pairs
     split_fx_model.recompile()  # Recompile to update forward method with new nodes
+
     with torch.no_grad():
         output_fx_model_split_quant = split_fx_model(
             example_input
         )  # Compute output after node splitting
 
     if torch.allclose(
-        output_fx_model, output_fx_model_split_quant, atol=1e-5
+        output_model, output_fx_model_split_quant, atol=1e-5
     ):  # Verify numerical consistency
         if debug:
             print(f"{BLUE} ✓ Split of Quant Nodes: output is consistent{ENDC}")
@@ -188,51 +205,74 @@ def exportBrevitas(
 
     if debug:
         print("\n=== 3. Network after the Split of Quant Nodes ===\n")
-        fx_model.graph.print_tabular()  # Display node-split model graph
+        printer.print_tabular(split_fx_model)
         print()
 
-    export_onnx_qcdq(  # Export node-split model to ONNX
-        split_fx_model,  # Model with split quant nodes
+    torch.onnx.export(
+        split_fx_model,
         args=example_input,
-        export_path=EXPORT_FOLDER / "3_model_qcdq_splitted_quant.onnx",
+        f=EXPORT_FOLDER / "3_model_splitted_quant.onnx",
         opset_version=13,
+        keep_initializers_as_inputs=True,
+        do_constant_folding=False,
     )
 
-    ###############################################################################
-    # 4. Modification of Dequant Nodes (shift them down)
-    ###############################################################################
+    # try:
+    #     tracer = NodeTracer(debug=True)
+    #     tracer.trace(split_fx_model, example_input)
+    #     if debug:
+    #         print(f"{BLUE} ✓ Tracing completed{ENDC}")
+    # except Exception as e:
+    #     print(f"{RED} ✗ Tracing failed: {str(e)}{ENDC}")
+    #     print("This doesn't affect the validity of the exported model")
 
-    # Perform the unification of linear dequant nodes (move dequantization after computation)
-    fx_model_unified = unify_linear_dequants(split_fx_model, debug=True)
-    fx_model_unified.recompile()  # Recompile to update forward method with new node arrangement
+    return split_fx_model
 
-    # Compute output after dequant node unification
-    with torch.no_grad():
-        output_fx_model_dequant_modified = fx_model_unified(
-            example_input
-        )  # Output after dequant modification
+    # ###############################################################################
+    # # 4. Modification of Dequant Nodes (shift them down)
+    # ###############################################################################
 
-    # Verify numerical consistency after dequant modification
-    if torch.allclose(
-        output_fx_model, output_fx_model_dequant_modified, atol=1e-5
-    ):  # Verify numerical consistency
-        if debug:
-            print(f"{BLUE} ✓ Modification of Dequant Nodes: output is consistent{ENDC}")
-    else:
-        raise RuntimeError(  # Raise error if inconsistent
-            f"{RED} ✗ Modification of Dequant Nodes changed the output significantly{ENDC}"
-        )
+    # # Perform the unification of linear dequant nodes (move dequantization after computation)
+    # fx_model_unified = unify_linear_dequants(split_fx_model, debug=debug)
+    # fx_model_unified.recompile()  # Recompile to update forward method with new node arrangement
 
-    if debug:
-        print("\n=== 4. Network after the Modification of Dequant Nodes ===\n")
-        fx_model_unified.graph.print_tabular()  # Display dequant modified model graph
-        print()
+    # # Compute output after dequant node unification
+    # with torch.no_grad():
+    #     output_fx_model_dequant_modified = fx_model_unified(
+    #         example_input
+    #     )  # Output after dequant modification
 
-    export_onnx_qcdq(
-        fx_model_unified,  # Model with unified dequant nodes
-        args=example_input,
-        export_path=EXPORT_FOLDER / "4_model_qcdq_dequant_moved.onnx",
-        opset_version=13,
-    )
+    # # Verify numerical consistency after dequant modification
+    # if torch.allclose(
+    #     output_model, output_fx_model_dequant_modified, atol=1e-5
+    # ):  # Verify numerical consistency
+    #     if debug:
+    #         print(f"{BLUE} ✓ Modification of Dequant Nodes: output is consistent{ENDC}")
+    # else:
+    #     raise RuntimeError(  # Raise error if inconsistent
+    #         f"{RED} ✗ Modification of Dequant Nodes changed the output significantly{ENDC}"
+    #     )
 
-    return fx_model_unified  # Return the final optimized FX GraphModule
+    # if debug:
+    #     print("\n=== 4. Network after the Modification of Dequant Nodes ===\n")
+    #     fx_model_unified.graph.print_tabular()  # Display dequant modified model graph
+    #     printer.print_tabular(fx_model_unified)
+    #     print()
+
+    # torch.onnx.export(
+    #     fx_model_unified,
+    #     args=example_input,
+    #     f=EXPORT_FOLDER / "4_model_dequant_moved.onnx",
+    #     opset_version=13,
+    #     keep_initializers_as_inputs=True,
+    #     do_constant_folding=False,
+    # )
+
+    # # export_onnx_qcdq(
+    # #     fx_model_unified,  # Model with unified dequant nodes
+    # #     args=example_input,
+    # #     export_path=EXPORT_FOLDER / "4_model_qcdq_dequant_moved.onnx",
+    # #     opset_version=13,
+    # # )
+
+    # return fx_model_unified  # Return the final optimized FX GraphModule
