@@ -11,6 +11,9 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./brevitexporter
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -18,15 +21,12 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: 3.11
-        working-directory: brevitas_exploration/brevitexporter
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           # Install in development mode including dev dependencies
           pip install -e .[dev]
-        working-directory: brevitas_exploration/brevitexporter
       - name: Run Tests
         run: |
           # Run all tests with verbose output and print statements
           python -m pytest -v -s
-        working-directory: brevitas_exploration/brevitexporter
