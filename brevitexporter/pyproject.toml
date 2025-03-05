@@ -22,17 +22,15 @@ dependencies = [
     "torchaudio>=2.1.2",
     "brevitas>=0.11.0",
     "torchmetrics",
-]
-
-[project.optional-dependencies]
-dev = [
     "black",
     "isort",
     "pytest",
     "netron",
     "tabulate",
     "tqdm",         
-    "colorama"      
+    "colorama",
+    "onnx",
+    "onnxoptimizer",
 ]
 
 [tool.setuptools]

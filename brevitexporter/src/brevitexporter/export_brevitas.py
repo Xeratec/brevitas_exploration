@@ -40,7 +40,7 @@ from brevitas.fx import brevitas_symbolic_trace  # Brevitas-specific symbolic tr
 from brevitexporter.utils.graph_printer import (
     GraphModulePrinter,
 )  # Custom Graph Printer
-from brevitexporter.utils.fx_interpreter import NodeTracer  
+from brevitexporter.utils.fx_interpreter import NodeTracer
 
 
 # ANSI color codes for improved debug output readability
