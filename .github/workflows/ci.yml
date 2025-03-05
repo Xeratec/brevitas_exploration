@@ -1,0 +1,32 @@
+# Copyright 2025 ETH Zurich and University of Bologna.
+# Licensed under the Apache License, Version 2.0, see LICENSE for details.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Federico Brancasi <fbrancasi@ethz.ch>
+
+name: CI Pipeline
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+        working-directory: brevitas_exploration/brevitexporter
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install in development mode including dev dependencies
+          pip install -e .[dev]
+        working-directory: brevitas_exploration/brevitexporter
+      - name: Run Tests
+        run: |
+          # Run all tests with verbose output and print statements
+          python -m pytest -v -s
+        working-directory: brevitas_exploration/brevitexporter
