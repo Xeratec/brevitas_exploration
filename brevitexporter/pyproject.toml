@@ -31,6 +31,8 @@ dev = [
     "pytest",
     "netron",
     "tabulate",
+    "tqdm",         
+    "colorama"      
 ]
 
 [tool.setuptools]
