@@ -108,6 +108,9 @@ def split_quant_nodes(
             and "quant" in node.target.lower()
             and "act_impl" not in node.target.lower()
         ):
+            top_level = node.target.split(".")[0]
+            if top_level in ["sigmoid"]:
+                continue  # Skip sigmoid
 
             original_module = fx_model.get_submodule(node.target)
             safe_target = node.target.replace(".", "_").replace("_quant", "")

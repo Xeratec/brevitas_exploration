@@ -141,6 +141,7 @@ def unify_linear_dequants(
             zero_point=old_bias_dequant_mod.zero_point,
             bit_width=old_bias_dequant_mod.bit_width,
         )
+
         fx_model.add_module(new_dequant_mod_name, unified_dequant_mod)
 
         # Insert the new dequant node after the linear's forward_impl

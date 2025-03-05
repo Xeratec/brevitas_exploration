@@ -193,6 +193,9 @@ def exportBrevitas(
             example_input
         )  # Compute output after node splitting
 
+    # print("Output Original: ", output_model)
+    # print("Output Split:    ", output_fx_model_split_quant)
+
     if torch.allclose(
         output_model, output_fx_model_split_quant, atol=1e-5
     ):  # Verify numerical consistency
@@ -217,62 +220,62 @@ def exportBrevitas(
         do_constant_folding=False,
     )
 
+    # return split_fx_model
+
+    ###############################################################################
+    # 4. Modification of Dequant Nodes (shift them down)
+    ###############################################################################
+
+    # Perform the unification of linear dequant nodes (move dequantization after computation)
+    fx_model_unified = unify_linear_dequants(split_fx_model, debug=debug)
+    fx_model_unified.recompile()  # Recompile to update forward method with new node arrangement
+
+    # Compute output after dequant node unification
+    with torch.no_grad():
+        output_fx_model_dequant_modified = fx_model_unified(
+            example_input
+        )  # Output after dequant modification
+
+    print("Output Original:         ", output_model)
+    print("Output Dequant Modified: ", output_fx_model_dequant_modified)
+
+    if debug:
+        print("\n=== 4. Network after the Modification of Dequant Nodes ===\n")
+        printer.print_tabular(fx_model_unified)
+        print()
+
+    # Verify numerical consistency after dequant modification
+    if torch.allclose(
+        output_model, output_fx_model_dequant_modified, atol=1e-5
+    ):  # Verify numerical consistency
+        if debug:
+            print(f"{BLUE} ✓ Modification of Dequant Nodes: output is consistent{ENDC}")
+    else:
+        raise RuntimeError(  # Raise error if inconsistent
+            f"{RED} ✗ Modification of Dequant Nodes changed the output significantly{ENDC}"
+        )
+
+    # if debug:
+    #     print("\n=== 4. Network after the Modification of Dequant Nodes ===\n")
+    #     printer.print_tabular(fx_model_unified)
+    #     print()
+
+    torch.onnx.export(
+        fx_model_unified,
+        args=example_input,
+        f=EXPORT_FOLDER / "4_model_dequant_moved.onnx",
+        opset_version=13,
+        keep_initializers_as_inputs=True,
+        do_constant_folding=False,
+    )
+
     # try:
     #     tracer = NodeTracer(debug=True)
-    #     tracer.trace(split_fx_model, example_input)
+    #     tracer.trace(fx_model_unified, example_input)
     #     if debug:
     #         print(f"{BLUE} ✓ Tracing completed{ENDC}")
     # except Exception as e:
     #     print(f"{RED} ✗ Tracing failed: {str(e)}{ENDC}")
     #     print("This doesn't affect the validity of the exported model")
 
-    return split_fx_model
-
-    # ###############################################################################
-    # # 4. Modification of Dequant Nodes (shift them down)
-    # ###############################################################################
-
-    # # Perform the unification of linear dequant nodes (move dequantization after computation)
-    # fx_model_unified = unify_linear_dequants(split_fx_model, debug=debug)
-    # fx_model_unified.recompile()  # Recompile to update forward method with new node arrangement
-
-    # # Compute output after dequant node unification
-    # with torch.no_grad():
-    #     output_fx_model_dequant_modified = fx_model_unified(
-    #         example_input
-    #     )  # Output after dequant modification
-
-    # # Verify numerical consistency after dequant modification
-    # if torch.allclose(
-    #     output_model, output_fx_model_dequant_modified, atol=1e-5
-    # ):  # Verify numerical consistency
-    #     if debug:
-    #         print(f"{BLUE} ✓ Modification of Dequant Nodes: output is consistent{ENDC}")
-    # else:
-    #     raise RuntimeError(  # Raise error if inconsistent
-    #         f"{RED} ✗ Modification of Dequant Nodes changed the output significantly{ENDC}"
-    #     )
-
-    # if debug:
-    #     print("\n=== 4. Network after the Modification of Dequant Nodes ===\n")
-    #     fx_model_unified.graph.print_tabular()  # Display dequant modified model graph
-    #     printer.print_tabular(fx_model_unified)
-    #     print()
-
-    # torch.onnx.export(
-    #     fx_model_unified,
-    #     args=example_input,
-    #     f=EXPORT_FOLDER / "4_model_dequant_moved.onnx",
-    #     opset_version=13,
-    #     keep_initializers_as_inputs=True,
-    #     do_constant_folding=False,
-    # )
-
-    # # export_onnx_qcdq(
-    # #     fx_model_unified,  # Model with unified dequant nodes
-    # #     args=example_input,
-    # #     export_path=EXPORT_FOLDER / "4_model_qcdq_dequant_moved.onnx",
-    # #     opset_version=13,
-    # # )
-
-    # return fx_model_unified  # Return the final optimized FX GraphModule
+    return fx_model_unified  # Return the final optimized FX GraphModule
