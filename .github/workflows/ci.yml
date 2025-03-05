@@ -9,7 +9,7 @@ name: CI Pipeline
 on: [push, pull_request]
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -24,9 +24,108 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          # Install in development mode including dev dependencies
           pip install -e .[dev]
-      - name: Run Tests
+      - name: Build Package
         run: |
-          # Run all tests with verbose output and print statements
-          python -m pytest -v -s
+          pip install build
+          python -m build --sdist --wheel .
+
+  test-mnist:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./brevitexporter
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+      - name: Run MNIST Test
+        run: |
+          python -m pytest -v -s src/brevitexporter/tests/test_mnist.py
+
+  test-resnet:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./brevitexporter
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+      - name: Run ResNet Test
+        run: |
+          python -m pytest -v -s src/brevitexporter/tests/test_resnet18.py
+
+  test-simple-cnn:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./brevitexporter
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+      - name: Run Simple CNN Test
+        run: |
+          python -m pytest -v -s src/brevitexporter/tests/test_simple_cnn.py
+
+  test-simple-mha:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./brevitexporter
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+      - name: Run Simple MHA Test
+        run: |
+          python -m pytest -v -s src/brevitexporter/tests/test_simple_mha.py
+
+  test-simple-nn:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./brevitexporter
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+      - name: Run Simple NN Test
+        run: |
+          python -m pytest -v -s src/brevitexporter/tests/test_simple_nn.py
