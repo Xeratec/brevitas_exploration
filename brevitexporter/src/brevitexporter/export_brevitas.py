@@ -68,14 +68,20 @@ def exportBrevitas(
         nn.Module: An FX GraphModule with explicit quantization operations.
     """
 
-    EXPORT_FOLDER = (
-        Path().cwd()
-    )  # Initialize export folder to current working directory
-    print(EXPORT_FOLDER)  # Display export folder path for reference
-    if Path().cwd().name != "onnx":  # Check if already in 'onnx' directory
-        EXPORT_FOLDER = (
-            EXPORT_FOLDER / "onnx"
-        )  # If not, create/use an 'onnx' subdirectory
+    # EXPORT_FOLDER = (
+    #     Path().cwd()
+    # )  # Initialize export folder to current working directory
+    # print(EXPORT_FOLDER)  # Display export folder path for reference
+    # if Path().cwd().name != "onnx":  # Check if already in 'onnx' directory
+    #     EXPORT_FOLDER = (
+    #         EXPORT_FOLDER / "onnx"
+    #     )  # If not, create/use an 'onnx' subdirectory
+
+    EXPORT_FOLDER = Path().cwd()
+    print(EXPORT_FOLDER)
+    if Path().cwd().name != "onnx":
+        EXPORT_FOLDER = EXPORT_FOLDER / "onnx"
+        EXPORT_FOLDER.mkdir(parents=True, exist_ok=True)
 
     printer = GraphModulePrinter()  # Instantiation of the custom printer
 
